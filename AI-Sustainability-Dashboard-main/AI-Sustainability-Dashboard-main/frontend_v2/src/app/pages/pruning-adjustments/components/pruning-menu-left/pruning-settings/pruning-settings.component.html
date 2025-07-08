@@ -1,0 +1,17 @@
+<div class="pruning-settings">
+  <app-form-input-select
+    [placeholder]="'GPU'"
+    [options]="gpus"
+    [control]="formGroup.controls.gpu"
+  />
+  <app-form-input-select
+    [placeholder]="'Location'"
+    [options]="locations"
+    [control]="formGroup.controls.location"
+  />
+  <app-form-input-select
+    [placeholder]="'Performance metric'"
+    [options]="metrics"
+    [control]="formGroup.controls.metric"
+  />
+</div>

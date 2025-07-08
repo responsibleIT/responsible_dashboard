@@ -1,0 +1,35 @@
+:host {
+  width: 100%;
+  flex: 1;
+}
+
+.benchmark-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+
+  .break-line {
+    margin: 1rem 3rem;
+    position: relative;
+
+    hr {
+      background-color: rgba(0, 0, 0, 0.2);
+      height: 1px;
+      border: none;
+    }
+
+    span {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: prompt-button, sans-serif;
+      font-size: 10px;
+      background-color: var(--color-fair-beige);
+      padding: 0 1rem;
+      color: var(--color-deeptrust);
+    }
+  }
+}

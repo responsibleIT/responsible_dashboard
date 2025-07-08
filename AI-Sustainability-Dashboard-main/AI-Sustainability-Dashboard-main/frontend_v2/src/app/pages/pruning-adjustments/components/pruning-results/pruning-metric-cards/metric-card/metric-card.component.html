@@ -1,0 +1,19 @@
+<div class="metric-card" [style]="'background-color: ' + color.background">
+  <span class="metric-card__title">
+    {{ metric.title | uppercase }}
+  </span>
+  <div class="metric-card__value">
+    <span class="metric-card__value__number" [style]="'color: ' + color.value">
+      {{ (formattedValue$ | async) }}
+    </span>
+    <span class="metric-card__value__unit" [style]="'color: ' + color.value">
+      {{ metric.unit }}
+    </span>
+  </div>
+  <div class="metric-card__change"
+       *ngIf="(percentageChange$ | async) !== null"
+       [style]="'color: ' + getPercentageChangeColor(changeType$ | async)">
+    <span class="metric-card__change__icon">{{ changeIcon$ | async }}</span>
+    <span class="metric-card__change__value">{{ (percentageChange$ | async) | number: '1.1-1' }}%</span>
+  </div>
+</div>

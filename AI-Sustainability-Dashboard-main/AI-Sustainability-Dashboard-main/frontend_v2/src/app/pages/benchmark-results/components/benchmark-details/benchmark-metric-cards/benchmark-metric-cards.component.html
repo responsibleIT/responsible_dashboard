@@ -1,0 +1,25 @@
+<div class="metrics-cards">
+  <app-benchmark-metric-card
+    [metric]="metrics?.power"
+    [type]="'power'"
+    [decimalFormat]="'1.6'"
+    [scientificNotation]="true"
+  />
+  <app-benchmark-metric-card
+    [metric]="metrics?.performance"
+    [type]="'performance'"
+    [decimalFormat]="'1.1-1'"
+  />
+  <app-benchmark-metric-card
+    [metric]="metrics?.emissions"
+    [type]="'emissions'"
+    [decimalFormat]="'1.8'"
+    [scientificNotation]="true"
+  />
+  <app-benchmark-metric-card
+    [metric]="metrics?.compute"
+    [type]="'compute'"
+    [decimalFormat]="'1.4'"
+    [scientificNotation]="true"
+  />
+</div>

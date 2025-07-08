@@ -1,0 +1,30 @@
+/* Custom styling for buttons */
+.custom-button {
+    background-color: #0E0E0E;
+    color: white !important;
+    border-color: #0E0E0E !important;
+}
+
+.custom-button:hover {
+    background-color: #383232 !important;
+    color: white !important;
+    border-color: #383232 !important;
+}
+  
+/* Override Bootstrap button styles */
+.btn-outline-secondary {
+    background-color: transparent !important;
+    color: #383232 !important;
+    border-color: #383232 !important;
+}
+
+.btn-outline-secondary:hover {
+    background-color: #383232 !important;
+    color: white !important;
+    border-color: #383232 !important;
+}
+  
+.btn-secondary:hover {
+    background-color: #383232 !important;
+    border-color: #383232 !important;
+}

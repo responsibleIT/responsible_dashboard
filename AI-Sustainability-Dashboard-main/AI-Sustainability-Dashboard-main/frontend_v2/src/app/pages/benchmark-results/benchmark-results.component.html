@@ -1,0 +1,37 @@
+<!-- benchmark-results.component.html -->
+<div class="benchmark-results">
+  <!-- Menu Toggle Button -->
+  <button
+    class="menu-toggle"
+    [class.active]="isMobileMenuOpen"
+    (click)="toggleMobileMenu()"
+    aria-label="Toggle menu">
+    <span></span>
+    <span></span>
+    <span></span>
+  </button>
+
+  <!-- Overlay -->
+  <div
+    class="overlay"
+    [class.active]="isMobileMenuOpen"
+    (click)="toggleMobileMenu()">
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar" [class.active]="isMobileMenuOpen">
+    <div class="sidebar-content">
+      <app-benchmark-menu-left
+        [data]="benchmarkData"
+      />
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <app-benchmark-details
+      [metricCards]="(metricCards$ | async)"
+      [classes]="(classPerformances$ | async)!"
+    />
+  </div>
+</div>

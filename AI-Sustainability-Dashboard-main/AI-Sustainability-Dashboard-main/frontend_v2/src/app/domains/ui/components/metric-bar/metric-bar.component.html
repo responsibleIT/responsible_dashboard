@@ -1,0 +1,27 @@
+<div class="metric-bar">
+  <div class="metric-bar__info">
+    <span class="metric-bar__info__label">
+      {{ type | titlecase }}
+    </span>
+    <div class="metric-bar__info__progress">
+      @if (pctChange) {
+        <span class="metric-bar__info__progress__change" [ngClass]="{'positive': pctChange > 0, 'negative': pctChange < 0}">
+          <ng-container *ngIf="pctChange > 0">↑</ng-container>
+          <ng-container *ngIf="pctChange < 0">↓</ng-container>
+          ({{ pctChange | number:'1.1-1' }}%)
+        </span>
+      }
+
+      <span class="metric-bar__info__progress__value">
+        {{ value * 100 }} {{ unit }}
+      </span>
+    </div>
+  </div>
+  <div class="metric-bar__progress">
+    <div
+      class="metric-bar__progress__bar"
+      [style.width]="value * 100 + '%'"
+      [style.background-color]="color"
+    ></div>
+  </div>
+</div>

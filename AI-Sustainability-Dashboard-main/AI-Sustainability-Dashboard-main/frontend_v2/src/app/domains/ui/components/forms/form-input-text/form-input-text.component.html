@@ -1,0 +1,9 @@
+<div class="form-input-text">
+  <label for="control" *ngIf="label">{{ label }}</label>
+  <input
+    [type]="type"
+    id="control"
+    [placeholder]="placeholder"
+    [formControl]="control"
+    [attr.aria-required]="required ? 'true' : null">
+</div>

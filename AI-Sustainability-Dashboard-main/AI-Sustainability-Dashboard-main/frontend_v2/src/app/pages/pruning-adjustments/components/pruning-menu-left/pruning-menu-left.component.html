@@ -1,0 +1,29 @@
+<div class="left-menu">
+  <div class="banner">
+    <h2>Check the <span style="color: var(--color-eco-green);">sustainability</span> effects by manipulating the values below</h2>
+  </div>
+
+  <div class="section">
+    <app-pruning-settings
+      [formGroup]="formGroup"
+      [gpus]="gpus"
+      [locations]="locations"
+      [metrics]="metrics"
+    />
+  </div>
+
+  <div class="section">
+    <app-form-input-slider
+      [label]="'Pruning Threshold'"
+      [min]="0"
+      [max]="10"
+      [step]="0.1"
+      [control]="formGroup.controls.threshold"
+    />
+  </div>
+
+  <div class="section">
+    <button appButton [ecogreen]="true" [fullWidth]="true" (click)="runBenchmark()">Run benchmark</button>
+    <a href="/">{{ 'Go back and upload new' | uppercase }}</a>
+  </div>
+</div>

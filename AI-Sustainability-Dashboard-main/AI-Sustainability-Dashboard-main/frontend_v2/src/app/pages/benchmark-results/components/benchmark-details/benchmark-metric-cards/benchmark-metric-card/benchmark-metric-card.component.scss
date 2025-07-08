@@ -1,0 +1,83 @@
+:host {
+  display: block; // Ensure it behaves as a block element
+  width: 100%; // Take full width of allocated flex space
+}
+
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 1rem;
+  box-sizing: border-box;
+  border-radius: 8px;
+  container-type: inline-size;
+  width: 100%;
+  height: 100%;
+
+  &__title {
+    color: var(--color-deeptrust);
+    padding: 0 0 8px 0;
+    text-align: center;
+    font-size: 0.8rem;
+    font-family: prompt-button, sans-serif;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  &__value {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+
+    &__number {
+      font-size: clamp(1.5rem, 12cqw, 2.5rem);
+      font-weight: 500;
+      color: var(--color-text-primary);
+      font-family: prompt-header, sans-serif;
+    }
+
+    &__unit {
+      font-size: clamp(0.9rem, 6cqw, 1.2rem);
+      font-weight: 500;
+      color: var(--color-text-primary);
+      font-family: prompt-header, sans-serif;
+    }
+  }
+
+  &__change {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: prompt-header, sans-serif;
+
+    &__percentage {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      font-family: prompt-header, sans-serif;
+    }
+
+    &__original {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    &__icon {
+      font-size: 1rem;
+      font-weight: bold;
+    }
+
+    &__value {
+      font-size: 0.875rem;
+    }
+  }
+}

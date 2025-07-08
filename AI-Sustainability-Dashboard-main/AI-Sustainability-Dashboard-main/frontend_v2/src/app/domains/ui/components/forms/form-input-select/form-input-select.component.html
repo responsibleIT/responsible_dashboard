@@ -1,0 +1,15 @@
+<div class="form-input-select">
+  <label [for]="id" *ngIf="label">{{ label }}</label>
+  <select
+    [id]="id"
+    [formControl]="control"
+    [attr.aria-required]="required ? 'true' : null"
+    [attr.aria-label]="label">
+    <option *ngIf="placeholder" [value]="null" [selected]="true">
+      {{ placeholder }}
+    </option>
+    <option *ngFor="let option of options" [value]="option.value">
+      {{ option.label | titlecase }}
+    </option>
+  </select>
+</div>

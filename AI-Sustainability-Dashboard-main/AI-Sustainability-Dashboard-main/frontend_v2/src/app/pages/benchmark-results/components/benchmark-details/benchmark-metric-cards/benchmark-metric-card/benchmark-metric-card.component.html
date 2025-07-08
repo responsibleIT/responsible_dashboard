@@ -1,0 +1,23 @@
+<div class="metric-card" [style]="'background-color: ' + color.background">
+  <span class="metric-card__title">
+    {{ metric?.title | uppercase }}
+  </span>
+  <div class="metric-card__value">
+    <span class="metric-card__value__number" [style]="'color: ' + color.value">
+      {{ prunedValue }}
+    </span>
+    <span class="metric-card__value__unit" [style]="'color: ' + color.value">
+      {{ metric?.unit }}
+    </span>
+  </div>
+  <div class="metric-card__change">
+    <div class="metric-card__change__percentage" [style]="'color: ' + getPercentageChangeColor(changeType!)">
+      <span class="metric-card__change__icon">{{ changeIcon }}</span>
+      <span class="metric-card__change__value">{{ percentageChange | number: '1.1-1' }}%</span>
+    </div>
+    <div class="metric-card__change__original">
+      <span class="metric-card__change__label">{{ 'Original:' }}</span>
+      <span class="metric-card__change__value">{{ originalValue }}</span>
+    </div>
+  </div>
+</div>
