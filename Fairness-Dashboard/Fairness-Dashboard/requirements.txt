@@ -1,0 +1,13 @@
+# Core Web Framework
+Flask==3.1.0
+
+# Data Handling & Computation
+pandas==2.2.3
+numpy==1.26.4
+scipy==1.15.2 
+
+# Machine Learning, Fairness Metrics & Feature Importance
+scikit-learn==1.6.1
+
+# System utilities
+psutil
