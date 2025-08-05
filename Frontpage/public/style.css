@@ -77,22 +77,22 @@ body.body-front{
   gap: 1.125rem;
 }
 
-h1 {
+.main-front h1 {
   text-transform: uppercase;
   font-size: clamp(1.5rem, 2vw, 2rem);
   text-align: center;
 }
 
-p + div{
+.main-front p + div{
   margin-top: 1rem;
 }
 
-p {
+.main-front p {
   font-weight: 400;
 }
 
-button,
-a.btn {
+.main-front button,
+.main-front a.btn {
   font-size: clamp(1rem, 1.5vw, 1.125rem);
   background: var(--tertiary);
   padding: 1em 2em;
@@ -101,13 +101,13 @@ a.btn {
   display: inline-block;
 }
 
-button.invert,
-a.btn.invert {
+.main-front button.invert,
+.main-front a.btn.invert {
   background: var(--secondary);
   color: var(--tertiary);
 }
 
-footer {
+footer.footer-front {
   height: 3.125rem;
   width: 100%;
   background: var(--secondary);
@@ -116,18 +116,18 @@ footer {
   justify-content: center;
 }
 
-header{
+header.header-front{
   width: 100%;
   display: flex;
   justify-content: center;
   padding-top: clamp(1rem, 3vw, 3.125rem);
 }
 
-header img{
+header.header-front img{
   width: clamp(7.5rem, 5vw, 100%);
 }
 
-footer > div, header > div {
+footer.footer-front > div, header.header-front > div {
   width: 90%;
   height: 100%;
   display: flex;
@@ -135,7 +135,7 @@ footer > div, header > div {
   justify-content: space-between;
 }
 
-footer ul, header ul {
+footer.footer-front ul, header.header-front ul {
   display: flex;
   gap: 2rem;
   text-transform: capitalize;
