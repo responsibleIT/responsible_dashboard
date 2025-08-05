@@ -40,6 +40,9 @@ body {
   --primary: #00e7b2;
   --secondary: #0e1042;
   --tertiary: #f7f5e9;
+}
+
+body.body-front{
   font-family: prompt;
   font-weight: 900;
   background: var(--primary);
@@ -49,7 +52,7 @@ body {
   flex-direction: column;
 }
 
-main {
+.main-front {
   display: grid;
   place-content: center;
   height: 100%;
@@ -57,16 +60,16 @@ main {
   gap: 1.875rem;
 }
 
-main img{
+.main-front img{
   justify-self: center;
   width: clamp(5rem, 5vw, 100%);
 }
 
-main > * {
+.main-front > * {
   max-width: 40rem;
 }
 
-main > div {
+.main-front > div {
   flex-wrap: wrap;
   display: flex;
   flex-direction: row;
