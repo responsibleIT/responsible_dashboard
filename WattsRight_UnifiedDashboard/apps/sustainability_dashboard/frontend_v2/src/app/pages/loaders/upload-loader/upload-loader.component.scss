@@ -1,0 +1,113 @@
+:host {
+  width: 100%;
+  height: 100dvh;
+}
+
+.loader-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-eco-green, #1DE9B6);
+  gap: 2rem;
+  padding: 1rem;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.loader {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(300px, 70vw, 70vh);
+  height: min(300px, 70vw, 70vh);
+  max-width: 300px;
+  max-height: 300px;
+}
+
+.loader__text {
+  position: absolute;
+  font-family: prompt-header, sans-serif;
+  font-size: clamp(1rem, 3vw, 1.5rem);
+  font-weight: 600;
+  color: var(--color-primary, #3a2e39);
+  text-align: center;
+  max-width: min(200px, 60vw);
+  line-height: 1.2;
+  padding: 0 0.5rem;
+  box-sizing: border-box;
+  hyphens: auto;
+  word-wrap: break-word;
+}
+
+.spinner-ring {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  position: relative;
+  background: conic-gradient(
+      transparent 0deg,
+      white 180deg,
+      transparent 180deg,
+      white 359deg
+  );
+  animation: spin 1.5s linear infinite;
+}
+
+.spinner-ring::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  background-color: var(--color-eco-green, #1DE9B6);
+  inset: 15px;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 480px) {
+  .loader-container {
+    gap: 1.5rem;
+    padding: 0.75rem;
+  }
+
+  .loader {
+    width: min(250px, 65vw, 65vh);
+    height: min(250px, 65vw, 65vh);
+  }
+}
+
+@media (max-width: 320px) {
+  .loader-container {
+    gap: 1rem;
+  }
+
+  .loader {
+    width: min(200px, 60vw, 60vh);
+    height: min(200px, 60vw, 60vh);
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .loader-container {
+    gap: 1rem;
+  }
+
+  .loader {
+    width: min(200px, 50vw, 50vh);
+    height: min(200px, 50vw, 50vh);
+  }
+
+  .loader__text {
+    font-size: clamp(0.875rem, 2.5vw, 1.25rem);
+  }
+}

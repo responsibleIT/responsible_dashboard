@@ -1,0 +1,20 @@
+<div class="metric-bar">
+  <div class="metric-bar__data">
+    <span class="metric-bar__data__label">{{ label | titlecase }}</span>
+    <div class="metric-bar__data__value">
+      <span class="metric-bar__data__value__number">{{ value * 100 | number: '1.1-1' }}%</span>
+      <span class="metric-bar__data__value__change"
+            *ngIf="pctChange"
+            [style.color]="pctChange > 0 ? '#16A34A' : '#DC2626'">
+        {{ pctChange > 0 ? '+' : '' }}{{ pctChange | number: '1.1-1' }}%
+      </span>
+    </div>
+  </div>
+  <div class="metric-bar__bar">
+    <div class="metric-bar__bar__fill"
+         [style.width.%]="value * 100"
+         [style.background-color]="pctChange ? (pctChange > 0 ? '#16A34A' : '#DC2626') : 'var(--color-deeptrust)'"
+    >
+    </div>
+  </div>
+</div>

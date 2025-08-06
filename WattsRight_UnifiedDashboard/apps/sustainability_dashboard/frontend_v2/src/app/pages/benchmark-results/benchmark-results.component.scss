@@ -1,0 +1,261 @@
+// benchmark-results.component.scss
+:host {
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.benchmark-results {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-fair-beige);
+  overflow: hidden;
+  padding: 2rem; // Add proper padding on desktop
+  gap: 2rem; // Increase gap on desktop
+  box-sizing: border-box;
+
+  // Tablet responsive padding
+  @media (max-width: 1024px) {
+    padding: 1.5rem;
+    gap: 1.5rem;
+  }
+
+  @media (max-width: 900px) {
+    padding: 1rem;
+    gap: 1rem;
+  }
+}
+
+/* Menu Toggle Button */
+.menu-toggle {
+  display: none; // Hidden by default on desktop
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1001;
+  background: var(--color-deeptrust);
+  color: var(--color-true-clear);
+  border: 2px solid var(--color-deeptrust);
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+
+  &:hover {
+    background: var(--color-deeptrust);
+    color: var(--color-white);
+    transform: scale(1.05);
+  }
+
+  span {
+    display: block;
+    width: 18px;
+    height: 2px;
+    background: currentColor;
+    margin: 2px 0;
+    transition: all 0.3s ease;
+    border-radius: 1px;
+  }
+
+  // X animation when active
+  &.active {
+    background: var(--color-deeptrust);
+    color: var(--color-white);
+
+    span:nth-child(1) {
+      transform: rotate(45deg) translate(4px, 4px);
+    }
+
+    span:nth-child(2) {
+      opacity: 0;
+    }
+
+    span:nth-child(3) {
+      transform: rotate(-45deg) translate(5px, -5px);
+    }
+  }
+}
+
+/* Overlay */
+.overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh; // Use dvh for mobile browser compatibility
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden; // Hide completely when not active
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+
+  &.active {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+/* Sidebar */
+.sidebar {
+  width: 400px;
+  height: auto; // Auto height on desktop
+  background: transparent; // Transparent on desktop so card shows through
+  transition: transform 0.3s ease;
+  z-index: 1000;
+  position: relative;
+  flex-shrink: 0;
+
+  @media (max-width: 1200px) {
+    width: 350px;
+  }
+
+  @media (max-width: 1024px) {
+    width: 320px;
+  }
+}
+
+.sidebar-content {
+  height: auto; // Auto height on desktop
+  overflow: visible; // No scroll on desktop
+  padding: 0; // Remove padding since main container has it now
+
+  @media (max-width: 1024px) {
+    padding: 0;
+  }
+
+  @media (max-width: 768px) {
+    height: 100%; // Full height on mobile
+    overflow-y: auto; // Enable scroll on mobile
+    padding: 0; // Remove padding on mobile
+  }
+}
+
+/* Main Content */
+.main-content {
+  flex: 1;
+  height: 100%;
+  overflow-y: auto;
+  padding: 0; // Remove padding since main container has it
+  min-width: 0;
+  position: relative;
+
+  @media (max-width: 1024px) {
+    padding: 0;
+  }
+
+  @media (max-width: 768px) {
+    padding: 0.5rem;
+    padding-top: 1rem;
+    // Ensure content doesn't get cut off by browser UI
+    min-height: 0;
+    height: 100%;
+  }
+
+  @media (max-width: 480px) {
+    padding: 0.25rem;
+    padding-top: 1rem;
+  }
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .benchmark-results {
+    padding: 0; // Remove padding on mobile
+    gap: 0; // Remove gap on mobile
+    // Use dvh instead of vh for better mobile support
+    height: 100dvh;
+    min-height: 100dvh;
+  }
+
+  .menu-toggle {
+    display: flex; // Show button only on mobile
+    // Adjust position to account for safe areas on mobile
+    top: max(1rem, env(safe-area-inset-top));
+    right: max(1rem, env(safe-area-inset-right));
+  }
+
+  .overlay {
+    display: block;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 320px;
+    max-width: 85vw;
+    height: 100vh; // Keep vh for sidebar as it's fixed
+    height: 100dvh; // Use dvh for mobile browser compatibility
+    background: var(--color-white); // White background on mobile
+    transform: translateX(-100%);
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.2);
+    // Add safe area padding for devices with notches
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    box-sizing: border-box;
+
+    &.active {
+      transform: translateX(0);
+    }
+  }
+
+  .main-content {
+    width: 100%;
+    height: 100vh;
+    height: 100dvh; // Use dvh for mobile browser compatibility
+    overflow-y: auto;
+    box-sizing: border-box;
+    // Add safe area padding
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebar {
+    width: 280px;
+  }
+}
+
+@media (max-width: 320px) {
+  .sidebar {
+    width: 260px;
+  }
+}
+
+// Additional fix for iOS Safari and other mobile browsers
+@supports (height: 100dvh) {
+  :host {
+    height: 100dvh;
+  }
+
+  @media (max-width: 768px) {
+    .benchmark-results {
+      height: 100dvh;
+      min-height: 100dvh;
+    }
+
+    .sidebar {
+      height: 100dvh;
+    }
+
+    .main-content {
+      height: 100dvh;
+    }
+
+    .overlay {
+      height: 100dvh;
+    }
+  }
+}

@@ -1,0 +1,14 @@
+<div class="benchmark-details" *ngIf="metricCards">
+  <app-benchmark-metric-cards
+    [metrics]="metricCards"
+  />
+
+  <div class="break-line">
+    <hr>
+    <span class="break-line-text">Drilldown</span>
+  </div>
+
+  <app-benchmark-classes
+    [classes]="classes"
+  />
+</div>

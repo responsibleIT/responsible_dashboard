@@ -1,0 +1,52 @@
+:root {
+  --color-eco-green: #00EBAF;
+  --color-eco-green-accent: #1fd3a5;
+  --color-deeptrust: #0E1045;
+  --color-deeptrust-accent: #1A1C6D;
+  --color-white: #FFFFFF;
+  --color-white-accent: #efefef;
+  --color-grayish: #86879C;
+  --color-true-clear: #FFFEF6;
+  --color-fair-beige: #F7F5E8;
+  --color-fair-beige-accent: #e6e5da;
+
+
+
+  --color-primary: #383232;
+  --color-primary-accent: #4B3F3F;
+
+  --color-background-primary: #FDFDF7;
+  --color-background-secondary: #FFFFFF;
+
+  --color-border-primary: #dee2e6;
+
+  --color-text-primary: #212529;
+  --color-text-secondary: #6c757d;
+  --color-text-light: #FFFFFF;
+  --color-text-link: #3B82F6;
+  --color-text-error: #e81111;
+  --color-text-success: #0dad0d;
+
+  --color-hover-indicator: rgba(0, 0, 0, 0.25);
+
+  --color-progress-bar-background: #E9ECEF;
+
+  --border-color-primary: #c6c6cc;
+  --border-color-secondary: #e5e7eb;
+  --border-color-tertiary: var(--color-primary);
+
+  --text-size-primary: 14px;
+  --text-size-secondary: 12px;
+
+  --small-devices: 600px;
+  --medium-devices: 768px;
+  --large-devices: 992px;
+  --extra-large-devices: 1200px;
+}
+
+
+// Mobile breakpoints
+$small-devices: 600px; // Extra small devices (phones, 600px and down... Use both min and max-width to avoid conflicts with small devices)
+$medium-devices: 768px; // Small devices (portrait tablets and large phones, 600px and up)
+$large-devices: 992px; // Medium devices (landscape tablets, 768px and up)
+$extra-large-devices: 1200px; // Large devices (laptops/desktops, 992px and up)

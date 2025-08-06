@@ -1,0 +1,50 @@
+<div class="grid">
+  <div class="grid__left">
+    <div class="chart-container">
+      <app-chart
+        [chartTitle]="'Power (per 1000 calls)'"
+        [xAxisLabel]="'Threshold' | uppercase"
+        [yAxisLabel]="'Power (kWh)' | uppercase"
+        [data]="powerChartData | async"
+        [scientificNotation]="true"
+        [titleColor]="'#663EB6'"
+        [lineColor]="'#663EB6'"
+      />
+    </div>
+    <div class="chart-container">
+      <app-chart
+        [chartTitle]="'Carbon footprint (per 1000 calls)'"
+        [xAxisLabel]="'Threshold' | uppercase"
+        [yAxisLabel]="'Carbon (gCO2)' | uppercase"
+        [data]="emissionsChartData | async"
+        [scientificNotation]="true"
+        [titleColor]="'#EE8438'"
+        [lineColor]="'#EE8438'"
+      />
+    </div>
+  </div>
+  <div class="grid__right">
+    <div class="chart-container">
+      <app-chart
+        [chartTitle]="'Predicted model accuracy'"
+        [xAxisLabel]="'Threshold' | uppercase"
+        [yAxisLabel]="'Accuracy (%)' | uppercase"
+        [data]="performanceChartData | async"
+        [titleColor]="'#05DBAC'"
+        [lineColor]="'#05DBAC'"
+        [rounding]="1"
+      />
+    </div>
+    <div class="chart-container">
+      <app-chart
+        [chartTitle]="'Computing power'"
+        [xAxisLabel]="'Threshold' | uppercase"
+        [yAxisLabel]="'Computing (TFLOPS)' | uppercase"
+        [data]="computeChartData | async"
+        [scientificNotation]="true"
+        [titleColor]="'#FE17B0'"
+        [lineColor]="'#FE17B0'"
+      />
+    </div>
+  </div>
+</div>

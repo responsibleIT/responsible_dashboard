@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Onboarding - Step {{ step }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- Base & Variables (Should match results.html) --- */
+        :root {
+            --primary-color: #007bff;
+            --primary-light: #e7f3ff;
+            --secondary-color: #6c757d;
+            --success-color: #198754;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --light-gray: #f8f9fa;
+            --medium-gray: #dee2e6;
+            --dark-gray: #6c757d;
+            --text-color: #343a40;
+            --card-bg: #ffffff;
+            --body-bg: #f4f7f6;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --font-family-sans-serif: 'Inter', sans-serif;
+        }
+        body { font-family: var(--font-family-sans-serif); line-height: 1.6; padding: 20px; background-color: var(--body-bg); color: var(--text-color); margin: 0; }
+        .container { max-width: 900px; margin: 30px auto; background-color: var(--card-bg); padding: 30px 40px; border-radius: var(--border-radius); box-shadow: var(--box-shadow); }
+        h1, h2 { text-align: center; margin-bottom: 25px; color: var(--primary-color); font-weight: 700;}
+        h2 { font-size: 1.5rem; margin-bottom: 15px; color: #444;}
+        h3 { font-size: 1.2rem; margin-top: 25px; margin-bottom: 10px; color: var(--secondary-color); font-weight: 600; border-bottom: 1px solid #eee; padding-bottom: 5px;}
+        p { margin-bottom: 15px; color: #555; }
+        strong { font-weight: 600; color: #333; }
+        code { background-color: #e9ecef; padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.9em; }
+        ul { margin-left: 20px; margin-bottom: 15px;}
+        li { margin-bottom: 5px; }
+
+        /* Navigation Buttons */
+        .onboarding-nav { margin-top: 30px; display: flex; justify-content: space-between; border-top: 1px solid #eee; padding-top: 20px; }
+        .nav-button { padding: 10px 20px; border: none; border-radius: var(--border-radius); cursor: pointer; font-size: 1rem; font-weight: 600; text-decoration: none; display: inline-block; transition: background-color 0.3s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .nav-button.next { background-color: var(--primary-color); color: white; }
+        .nav-button.next:hover { background-color: #0056b3; }
+        .nav-button.back { background-color: var(--secondary-color); color: white; }
+        .nav-button.back:hover { background-color: #5a6268; }
+        .nav-button.finish { background-color: var(--success-color); color: white; }
+        .nav-button.finish:hover { background-color: #146c43; }
+        .nav-button:disabled { background-color: #e9ecef; color: #6c757d; cursor: not-allowed; }
+
+        /* Highlighting sections */
+        .highlight-section { border: 2px dashed var(--primary-color); padding: 15px; margin: 20px 0; background-color: var(--primary-light); border-radius: 5px;}
+        .highlight-section h3 { margin-top: 0; border-bottom: none; color: var(--primary-color)}
+        .highlight-section h4 { font-size: 1rem; margin-top: 15px; margin-bottom: 8px; color: #333; font-weight: bold;}
+
+
+        /* Mock UI elements */
+        .mock-upload input[type="text"], .mock-upload input[type="file"] { border: 1px solid #ccc; background-color: #eee; padding: 8px; width:80%; margin:auto; display:block; text-align:center; border-radius: 4px; margin-bottom: 8px;}
+        .mock-config label { font-weight: bold; display: block; margin-bottom: 5px;}
+        .mock-config select, .mock-config .checkbox-group, .mock-config .radio-group-mock { background-color: #eee; border: 1px solid #ccc; padding: 8px; margin-bottom: 10px; border-radius: 4px;}
+        .mock-config select { width: 100%; }
+        .mock-config .checkbox-group, .mock-config .radio-group-mock { min-height: 60px; max-height: 120px; overflow-y: auto;}
+        .mock-config .radio-group-mock label { font-weight: normal; display: flex; align-items: center;}
+        .mock-config .radio-group-mock input[type="radio"] { margin-right: 5px;}
+        .mock-config span.selected { font-weight: bold; background-color: #d1ecf1; padding: 2px 4px; border-radius: 3px;}
+        .mock-config label.cb-label { display: flex; align-items: center; font-weight: normal;}
+        .mock-config input[type="checkbox"] { margin-right: 5px;}
+        .mock-config .hyperparameter-section-mock {
+            margin-top: 10px; padding: 10px; border: 1px dashed #aaa; border-radius: 4px; background-color: #f0f0f0; font-size: 0.9em;
+        }
+        .mock-config .hyperparameter-section-mock h5 { font-size: 0.9em; margin-top: 0; margin-bottom: 5px;}
+        .mock-config .hyperparameter-section-mock input[type="text"], .mock-config .hyperparameter-section-mock input[type="file"] { width: auto; padding: 4px 6px; font-size: 0.9em; margin-left: 5px; display: inline-block; background-color: #fff; border: 1px solid #ccc; }
+
+
+        /* --- Replicated Results Styles (Simplified) --- */
+        .summary-card { background-color: #f0f5ff; padding: 15px 20px; border-radius: var(--border-radius); margin-bottom: 20px; border-left: 5px solid var(--primary-color); border: 1px solid #dde;}
+        .summary-card h4 { margin-top: 0; margin-bottom: 15px; color: var(--primary-color); font-size: 1.2rem; }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+        .summary-item { background-color: var(--light-gray); padding: 8px 12px; border-radius: 6px; border: 1px solid #eee;}
+        .summary-item strong { display: block; font-size: 0.75rem; color: var(--secondary-color); margin-bottom: 2px; text-transform: uppercase; }
+        .summary-item span, .summary-item ul { font-size: 0.95rem; font-weight: 600; color: var(--text-color); margin:0; padding: 0; list-style: none;}
+        .summary-item li { display: inline-block; background-color: #e0e0e0; padding: 1px 4px; border-radius: 3px; margin-right: 3px; font-size: 0.9em;}
+        .summary-accuracy .value-line strong { font-size: 1.2rem !important; margin-right: 0; } /* Make accuracy value smaller */
+        .budget-active-note { color: var(--danger-color); font-weight: bold; font-size: 0.9em; display: block; margin-top: 3px;}
+        .accordion-item { background-color: #fff; margin-bottom: 10px; border-radius: var(--border-radius); border: 1px solid var(--medium-gray); overflow: hidden; }
+        .accordion-header { background-color: #e9ecef; padding: 10px 15px; cursor: default; font-weight: 600; font-size: 1.1rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--medium-gray); }
+        .accordion-header::after { content: '▼'; font-size: 1rem; color: var(--secondary-color); } /* Indicate content visible */
+        .accordion-content { display: block; padding: 20px; border-top: none; } /* Always show content */
+        .metric-card { border: 1px solid #eee; border-radius: 6px; padding: 15px; margin-bottom: 15px; background-color: #fff; }
+        .metric-card h5 { display: flex; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 12px; font-size: 1rem; }
+        .metric-card .disparity-summary { text-align: right; font-size: 0.85em; color: var(--dark-gray); margin-bottom: 12px; }
+        .metric-card .disparity-summary strong { color: var(--text-color); font-size: 1em;}
+        .metric-group-breakdown { display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start; }
+        .metric-group-item { flex: 1; min-width: 180px; text-align: center; }
+        .metric-group-item .group-name { font-weight: 600; margin-bottom: 8px; font-size: 0.9rem; }
+        .metric-group-item .icon-viz-container { margin-top: 0; background: none; border: none; padding: 0; text-align: left; }
+        .metric-group-item .viz-group-label { display: none; }
+        .metric-group-item .person-icons { justify-content: center; margin-bottom: 8px; }
+        .info-icon { display: inline-block; width: 14px; height: 14px; line-height: 14px; text-align: center; border-radius: 50%; background-color: #6c757d; color: white; font-size: 10px; font-weight: bold; cursor: help; margin-left: 5px; position: relative; top: -1px; flex-shrink: 0; }
+        .icon-viz-container { margin-top: 8px; margin-bottom: 12px; padding: 8px; background-color: #f8f8f8; border: 1px solid #eee; border-radius: 4px; }
+        .icon-viz-container .viz-description { font-size: 0.75em; margin: 0 0 6px 0; color: #555; text-align: center;}
+        .icon-viz-container .viz-group { display: block; text-align: center; margin-bottom: 4px; }
+        .icon-viz-container .viz-group-label { display: block; font-weight: bold; margin-bottom: 2px; font-size: 0.8rem; color: #444; }
+        .icon-viz-container .person-icons { display: flex; gap: 1px; justify-content: center;}
+        .person-img-icon { height: 1.1em; width: auto; display: inline-block; vertical-align: middle; margin: 0 1px; }
+        .detail-table { border-collapse: collapse; width: 100%; margin-top: 15px; font-size: 0.9rem; border: 1px solid var(--medium-gray); border-radius: var(--border-radius); box-shadow: 0 1px 3px rgba(0,0,0,0.04); overflow: hidden;}
+        .detail-table th, .detail-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--medium-gray); }
+        .detail-table th { background-color: var(--light-gray); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: var(--secondary-color); border-bottom-width: 2px; }
+        .detail-table tbody tr:last-child td { border-bottom: none; }
+        .detail-table .metric-value { text-align: right; font-family: monospace, sans-serif; }
+        .detail-table .significant-yes { color: var(--danger-color); font-weight: bold; text-align: center; }
+        .detail-table tr.significant-row td { background-color: #fff3f3; }
+
+        /* Sidebar Controls for Onboarding Example */
+        .onboarding-controls { border: 1px dashed #ccc; padding: 15px; margin-top: 15px; background-color: #f9f9f9;}
+        .onboarding-controls label { font-size: 0.9em; display: flex; align-items: center; margin-bottom: 8px;}
+        .onboarding-controls input[type=checkbox]{ margin-right: 5px;}
+        .onboarding-controls .budget-placeholder { margin-bottom: 5px;}
+        .onboarding-controls .budget-groups { border: none; padding-left: 10px; margin-left: 0;}
+        .onboarding-controls .importance-list-container { margin-left: 0; border: none; padding-left: 5px;}
+
+        /* Pie Chart Mock */
+        .mock-pie-chart-container { background-color: #fff; padding: 10px; border-radius: var(--border-radius); box-shadow: 0 2px 6px rgba(0,0,0,0.06); border: 1px solid var(--medium-gray); text-align: center; max-width: 200px; margin: 10px auto;}
+        .mock-pie-chart-container h6 { font-size: 0.9rem; color: var(--text-color); margin-bottom: 8px; }
+        .mock-pie-chart { width: 100px; height: 100px; border-radius: 50%; background-image: conic-gradient(#007bff 0% 30%, #28a745 30% 70%, #ffc107 70% 100%); margin: auto; }
+        .mock-pie-chart-container p { font-size: 0.8em; color: #666; margin-top: 5px;}
+
+        /* History Chart Mock */
+        .mock-history-chart-container { border: 1px solid #ccc; padding: 15px; text-align: center;}
+        .mock-history-chart-container img { max-width: 80%; height: auto; border: 1px solid #ddd;}
+        .mock-history-button { display:inline-flex; align-items: center; background-color: var(--secondary-color); color:white; padding: 5px 10px; border-radius:4px; font-size:0.9em; margin-bottom:10px;}
+        .mock-history-button img { width: 12px; height: 12px; margin-right: 4px; filter: brightness(0) invert(1); }
+
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dashboard Onboarding (Step {{ step }} of {{ total_steps }})</h1>
+
+        {# --- Step 1: Welcome --- #}
+        {% if step == 1 %}
+            <h2>Welcome to the Fairness Analysis Dashboard!</h2>
+            <p>Understanding the fairness of AI and algorithmic decisions is an important part of responsible development. This dashboard is designed to help you proactively examine your classification models for potential differences in how they perform for various groups (such as by neighbourhood or applicant type).</p>
+            <p>The idea of "fairness" can vary depending on the specific situation and what's most important to achieve. We'll walk you through common ways to measure and think about fairness, so you can assess your model with confidence.</p>
+            <p>To illustrate, this brief tour uses a straightforward example: predicting <strong>housing application approval</strong> based on applicant information.</p>
+            <p>Click "Next" to explore, or feel free to skip to uploading your own data.</p>
+        {% endif %}
+
+        {# --- Step 2: Uploading Your Data (Initial Dataset) --- #}
+        {% if step == 2 %}
+            <h2>Step 2: Uploading Your Dataset</h2>
+            <p>The first step is to upload your data. This should be a <strong>CSV file</strong> containing all the information needed for the analysis, such as features, the actual outcomes (target variable), and any protected attributes you want to examine for fairness.</p>
+            <div class="highlight-section">
+                <h3>Example: Uploading `housing_applications.csv`</h3>
+                <div class="mock-upload">
+                     <label for="file_csv" style="text-align:center; margin-bottom:10px;">Choose CSV File:</label>
+                     <input type="text" id="file_csv" value="housing_applications_example.csv" readonly>
+                </div>
+                <p style="margin-top:15px;">After you select your CSV file on the main page and click "Upload", the dashboard will read its column headers. This prepares for the next step where you'll configure how these columns are used.</p>
+                <p><strong>Important Note:</strong>
+                    <ul>
+                        <li>If you plan to <strong>train a new model</strong> within this dashboard, the CSV you upload here should be your <em>training and validation data</em>.</li>
+                        <li>If you plan to <strong>evaluate a pre-trained model</strong> (which you'll specify in the next step), this CSV should be your <em>evaluation dataset</em>.</li>
+                    </ul>
+                </p>
+            </div>
+            <p>Click "Next" to see how to configure the analysis based on your uploaded data.</p>
+        {% endif %}
+
+        {# --- Step 3: Configure (Simulated) --- #}
+        {% if step == 3 %}
+            <h2>Step 3: Configuring the Analysis</h2>
+            <p>After uploading your data, you'll configure the analysis. This involves telling the dashboard how to interpret your data and what kind of model to use.</p>
+             <div class="highlight-section mock-config">
+                <h3>Example Configuration Selections</h3>
+
+                <h4>1. Select Model Type & Parameters</h4>
+                <div class="radio-group-mock">
+                    <label><input type="radio" name="model_type_onboarding" value="new_lr" checked> Logistic Regression (Train New)</label>
+                    <div class="hyperparameter-section-mock" id="mock_lr_params" style="display:block;">
+                        <h5>LR Parameters</h5>
+                        <label for="lr_c_onboarding">C: <input type="text" id="lr_c_onboarding" value="1.0" readonly></label>
+                        <label for="lr_solver_onboarding" style="margin-left:10px;">Solver: <input type="text" id="lr_solver_onboarding" value="lbfgs" readonly></label>
+                    </div>
+                    <label><input type="radio" name="model_type_onboarding" value="new_svm"> Support Vector Machine (SVM) (Train New)</label>
+                     <div class="hyperparameter-section-mock" id="mock_svm_params" style="display:none;">
+                        <h5>SVM Parameters</h5>
+                        <label for="svm_c_onboarding">C: <input type="text" id="svm_c_onboarding" value="1.0" readonly></label>
+                        <label for="svm_kernel_onboarding" style="margin-left:10px;">Kernel: <input type="text" id="svm_kernel_onboarding" value="rbf" readonly></label>
+                    </div>
+                    <label><input type="radio" name="model_type_onboarding" value="upload"> Upload Pre-trained Model</label>
+                     <div class="hyperparameter-section-mock" id="mock_upload_params" style="display:none;">
+                        <h5>Upload Model Files</h5>
+                        <label for="mock_model_file">Model File (.pkl/.joblib): <input type="file" id="mock_model_file" disabled></label>
+                        <label for="mock_meta_file" style="margin-top:5px;">Metadata File (.json): <input type="file" id="mock_meta_file" disabled></label>
+                        <small style="font-size:0.85em; margin-top:3px;">(You would select your files here on the actual page)</small>
+                    </div>
+                </div>
+                <p style="font-size:0.9em; margin-top:5px;">
+                    You can choose to train a new model (like Logistic Regression or SVM) using the uploaded dataset, and you can set its parameters.
+                    Alternatively, you can select "Upload Pre-trained Model". If you choose this, you'll need to provide:
+                    <ul>
+                        <li>Your <strong>model file</strong> (<code>.pkl</code> or <code>.joblib</code>).</li>
+                        <li>A <strong>metadata file</strong> (<code>.json</code>). This file is important because it tells the dashboard about your model, like the exact list of feature names it was trained on (and their order) and details about any data preprocessing (like scaling or encoding) that was part of the original model. This helps the dashboard prepare your evaluation data correctly.</li>
+                    </ul>
+                </p>
+
+                <h4 style="margin-top:20px;">2. Define Outcome Meaning (for Target Variable = 1)</h4>
+                <div class="radio-group-mock" style="max-height:none;">
+                    <label><input type="radio" name="outcome_polarity_onboarding" value="positive" checked> Target '1' means a <strong style="color: var(--success-color);">Positive Outcome</strong> (e.g., Application Approved, Loan Granted, Low Risk)</label>
+                    <label><input type="radio" name="outcome_polarity_onboarding" value="negative"> Target '1' means a <strong style="color: var(--danger-color);">Negative Outcome</strong> (e.g., Application Rejected, Loan Denied, High Risk)</label>
+                </div>
+                <p style="font-size:0.9em; margin-top:5px;">This setting is about context. It helps the dashboard label results and metrics in a way that makes sense for your specific problem. For example, if your target '1' means "loan approved", that's generally positive. If '1' means "fraud detected", that might be considered negative in the context of approving a transaction, but positive from a risk management perspective. Choose what best reflects the primary interpretation of a '1' in your target variable.</p>
+
+                <h4 style="margin-top:20px;">3. Select Columns from Your Dataset</h4>
+                 <label>Target Variable:</label>
+                 <select disabled><option><span class="selected">{{ target_col }}</span> (e.g., the column indicating if an application was approved or rejected)</option></select>
+                 <small>This is the actual outcome your model is trying to predict. It must be a binary (two-value) column.</small>
+                 <br><br>
+                 <label>Protected Attributes:</label>
+                 <div class="checkbox-group">
+                     {% for col in protected_cols %}
+                         <label class="cb-label"><input type="checkbox" checked disabled> <span class="selected">{{ col }}</span></label>
+                     {% endfor %}
+                 </div>
+                 <small>These are the groups you want to compare fairness across (e.g., `neighbourhood`, `applicant_type`).</small>
+                 <br><br>
+                 <label>Model Features:</label>
+                 <div class="checkbox-group">
+                      {% for col in current_feature_cols %}
+                         <label class="cb-label"><input type="checkbox" checked disabled> <span class="selected">{{ col }}</span></label>
+                      {% endfor %}
+                 </div>
+                 <small>These are the inputs the model will use (if training new) or used (if evaluating pre-trained) to make predictions (e.g., `income_k`, `credit_score`). For uploaded models, these must match the features the model expects, as detailed in your metadata file.</small>
+                 <p style="margin-top:15px; font-size: 0.9em"><strong>Note:</strong> A column cannot be selected as the Target, a Protected Attribute, AND a Model Feature simultaneously.</p>
+             </div>
+             <p>After making these selections on the actual configuration page, you'll click the button to proceed with the analysis.</p>
+             <p>Click "Next" to see the results overview.</p>
+        {% endif %}
+
+        {# --- Step 4: Results - Summary & Overview --- #}
+        {% if step == 4 %}
+            <h2>Step 4: Results Overview</h2>
+            <p>The results page starts with a quick summary of the model's overall performance and the configuration used for the current run.</p>
+            <div class="highlight-section">
+                <h3>A. Run Summary Card</h3>
+                <div class="summary-card" style="margin: 10px 0;">
+                     <h4>Run Summary</h4>
+                     <div class="summary-grid">
+                         <div class="summary-item summary-accuracy">
+                            <strong>Accuracy</strong>
+                            <div class="value-line">
+                                <strong>{{"%.1f"|format(current_accuracy * 100)}}%</strong>
+                                {% if prev_accuracy is number and current_accuracy is number %}
+                                 {% set acc_diff = current_accuracy - prev_accuracy %}
+                                 {% set acc_diff_class = 'diff-positive' if acc_diff > 0.0001 else ('diff-negative' if acc_diff < -0.0001 else 'diff-neutral') %}
+                                 {% set acc_diff_sign = '+' if acc_diff > 0.0001 else '' %}
+                                 <span class="metric-diff {{ acc_diff_class }}" style="font-size:0.8em; padding: 1px 3px; border-radius:3px; color:white; background-color: {{'var(--success-color)' if acc_diff_class == 'diff-positive' else ('var(--danger-color)' if acc_diff_class == 'diff-negative' else 'var(--secondary-color)') }};">
+                                    ({{ acc_diff_sign }}{{ "%.1f"|format(acc_diff * 100) }}% vs prev)
+                                 </span>
+                                {% endif %}
+                            </div>
+                         </div>
+                         <div class="summary-item"><strong>Target Variable</strong><span>{{ target_col }}</span></div>
+                         <div class="summary-item"><strong>Outcome (Target=1)</strong><span style="color: {{'var(--success-color)' if outcome_polarity == 'positive' else 'var(--danger-color)'}};">{{ outcome_polarity | capitalize }}</span></div>
+                         <div class="summary-item"><strong>Model Used</strong><span>{{ model_config.type | replace('_', ' ') | title }}</span></div>
+                         <div class="summary-item"><strong>Protected Attributes</strong><ul>{% for item in protected_cols %}<li>{{ item }}</li>{% endfor %}</ul></div>
+                         <div class="summary-item"><strong>Model Features</strong><span>{{ current_feature_cols | length }} selected</span></div>
+                         <div class="summary-item"><strong>Test Set Size</strong><span>{{ test_set_size }}</span></div>
+                         <div class="summary-item"><strong>Budgeting Status</strong><span>{{ "Applied" if budget_applied_info.active else "Not Applied" }}</span>{% if budget_applied_info.active %}<small class="budget-active-note">Group models used.</small>{% endif %}</div>
+                     </div>
+                </div>
+            </div>
+            <h3>B. Fairness Analysis Sections</h3>
+            <p>Below the summary, results are grouped into expandable sections for each protected attribute you selected (e.g., Neighbourhood, Applicant Type). Each section contains several fairness metrics.</p>
+            <div class="highlight-section">
+                 {% set first_attr = protected_cols[0] %}
+                 <div class="accordion-item active"> {# Show first one open #}
+                    <div class="accordion-header">{{ first_attr.replace('_',' ').title() }}</div>
+                     <div class="accordion-content">(Metrics for {{ first_attr }} like Demographic Parity, Equalized Odds, etc., appear here, along with detailed tables and visualizations.)</div>
+                </div>
+                 {% if protected_cols | length > 1 %}
+                 <div class="accordion-item">
+                    <div class="accordion-header">{{ protected_cols[1].replace('_',' ').title() }}</div>
+                     <div class="accordion-content">(Content hidden until clicked on the actual results page...)</div>
+                </div>
+                {% endif %}
+            </div>
+            <p>Click "Next" to dive into the specific fairness metrics.</p>
+        {% endif %}
+
+        {# --- Step 5: Results - DP Explained --- #}
+        {% if step == 5 %}
+            <h2>Step 5: Understanding Demographic Parity</h2>
+            {% set attribute_key = protected_cols[0] %} {# Example: "neighbourhood" #}
+            <p>Let's look at the results for <strong>{{ attribute_key.replace('_',' ').title() }}</strong>.</p>
+            <div class="highlight-section">
+                <h3>Example: Demographic Parity for '{{ attribute_key.replace('_',' ').title() }}'</h3>
+                <div class="accordion-item active">
+                    <div class="accordion-header">{{ attribute_key.replace('_',' ').title() }}</div>
+                    <div class="accordion-content">
+                        <div class="metric-card">
+                             <h5>Demographic Parity <span class="info-icon" title="Measures if the model approves applications (predicts the outcome you defined as 'positive' for Target=1) at similar rates across different groups. It doesn't consider if the approval was correct.">(?)</span></h5>
+                             {% set current_groups_data = current_fairness_results[attribute_key]['groups'] %}
+                             {% set dp_values = [] %}{% for group_name, metrics_val in current_groups_data.items() %}{% set dp_val = metrics_val.get('Demographic Parity') %}{% if dp_val is number and dp_val == dp_val %}{% set _ = dp_values.append(dp_val) %}{% endif %}{% endfor %}
+                             {% if dp_values and dp_values|length > 1 %}{% set diff_dp = (dp_values | max) - (dp_values | min) %}<p class="disparity-summary">Max Difference in {{ "Positive Outcome" if outcome_polarity == 'positive' else "Negative Outcome" }} Prediction Rate: <strong>{{"%.3f"|format(diff_dp)}}</strong></p>{% endif %}
+                             <div class="metric-group-breakdown">
+                                 {% for group_name, current_metrics_item in current_groups_data.items() %}
+                                 <div class="metric-group-item">
+                                     <span class="group-name">{{ group_name }}</span>
+                                     <div style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color); margin-bottom: 10px;">{{"%.3f"|format(current_metrics_item.get('Demographic Parity', 0))}}</div>
+                                     <div class="icon-viz-container">
+                                          <p class="viz-description">Model predicts '{{ "Approved" if outcome_polarity == 'positive' else "High Risk" }}' for (out of 10):</p>
+                                          {% set dp_value_item = current_metrics_item.get('Demographic Parity', 0) %}{% set num_colored = (dp_value_item * 10) | round | int %}
+                                          <div class="person-icons">{% for i in range(10) %}<img class="person-img-icon" src="{{ url_for('static', filename='person_colored.png') if i < num_colored else url_for('static', filename='person_uncolored.png') }}" alt="">{% endfor %}</div>
+                                     </div>
+                                 </div>
+                                 {% endfor %}
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <h3>What does Demographic Parity tell us?</h3>
+            <p>It checks if the model predicts the outcome you've defined as positive (when Target=1) at similar rates for different groups. This is done without considering whether those predictions were actually correct or if the individuals were truly suitable for that outcome.</p>
+             <h4>When might Demographic Parity be a focus?</h4>
+            <p>Consider a company using an AI to screen resumes for entry-level positions. They might want to ensure that candidates from different ethnic backgrounds (a protected attribute) are *selected for an interview* at roughly similar rates. Even if historical data suggests different qualification rates (which could itself stem from past biases), the company might aim for Demographic Parity in this initial screening to help ensure a diverse pool of candidates gets a closer look by human reviewers. Here, the 'positive outcome' (Target=1) would be "selected for an interview." A large difference in selection rates could mean the AI is disproportionately filtering out one group early on.</p>
+            <h4>In our housing example (assuming 'Approved' is the positive outcome):</h4>
+            <ul>
+                 {% set group_names_list = current_groups_data.keys() | list %}
+                 {% set val1_dp = current_groups_data[group_names_list[0]].get('Demographic Parity', 0) %}
+                 {% set val2_dp = current_groups_data[group_names_list[1]].get('Demographic Parity', 0) %}
+                <li>Applications from <strong>{{ group_names_list[0] }}</strong> are predicted as 'Approved' for <strong>{{ (val1_dp * 10) | round | int }} out of 10</strong> applicants ({{ "%.0f"|format(val1_dp*100) }}%).</li>
+                 <li>Applications from <strong>{{ group_names_list[1] }}</strong> are predicted as 'Approved' for <strong>{{ (val2_dp * 10) | round | int }} out of 10</strong> applicants ({{ "%.0f"|format(val2_dp*100) }}%).</li>
+                 {% if diff_dp is defined %}<li>The difference ({{ "%.2f"|format(diff_dp) }}) indicates a disparity. If strict Demographic Parity were the goal, this difference should be close to zero.</li>{% endif %}
+            </ul>
+            <p>A notable difference here suggests that one group is much more (or less) likely to receive a prediction for the 'positive' outcome from the model.</p>
+             <p>Click "Next" to look at other fairness metrics.</p>
+        {% endif %}
+
+        {# --- Step 6: Results - EqOdds & PP Explained --- #}
+        {% if step == 6 %}
+            <h2>Step 6: Understanding Equalized Odds & Predictive Parity</h2>
+            {% set attribute_key = protected_cols[0] %} {# Example: "neighbourhood" #}
+            {% set current_groups_data_step6 = current_fairness_results[attribute_key]['groups'] %}
+             <div class="highlight-section">
+                 <h3>Example: Other Metrics for '{{ attribute_key.replace('_',' ').title() }}'</h3>
+                <div class="accordion-item active">
+                    <div class="accordion-header">{{ attribute_key.replace('_',' ').title() }}</div>
+                    <div class="accordion-content">
+                        <!-- EqOdds Card -->
+                        <div class="metric-card">
+                            <h5>Equalized Odds <span class="info-icon" title="Aims for the model to correctly identify those who should get the positive outcome (True Positive Rate) AND correctly identify those who should get the negative outcome (related to False Positive Rate) at similar rates across groups. TPR is shown below; check detailed table for FPR.">(?)</span></h5>
+                             {% set eqodds_tpr_values = [] %}{% for group_name, metrics_val in current_groups_data_step6.items() %}{% set tpr_val = metrics_val.get('Equalized Odds') %}{% if tpr_val is number and tpr_val == tpr_val %}{% set _ = eqodds_tpr_values.append(tpr_val) %}{% endif %}{% endfor %}
+                             {% if eqodds_tpr_values and eqodds_tpr_values|length > 1 %}{% set diff_eqodds_tpr = (eqodds_tpr_values | max) - (eqodds_tpr_values | min) %}<p class="disparity-summary">Max TPR Difference: <strong>{{"%.3f"|format(diff_eqodds_tpr)}}</strong></p>{% endif %}
+                             <div class="metric-group-breakdown">
+                                 {% for group_name, current_metrics_item in current_groups_data_step6.items() %}
+                                 <div class="metric-group-item">
+                                     <span class="group-name">{{ group_name }}</span>
+                                     <div style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color); margin-bottom: 10px;">{{"%.3f"|format(current_metrics_item.get('Equalized Odds', 0))}}</div>
+                                     <div class="icon-viz-container">
+                                          <p class="viz-description">TPR: Correctly predicted '{{ "Approved" if outcome_polarity == 'positive' else "High Risk"}}' (of 10 who actually qualified):</p>
+                                          {% set eqodds_tpr_value_item = current_metrics_item.get('Equalized Odds', 0) %}{% set num_colored_eo = (eqodds_tpr_value_item * 10) | round | int %}
+                                          <div class="person-icons">{% for i in range(10) %}<img class="person-img-icon" src="{{ url_for('static', filename='person_colored.png') if i < num_colored_eo else url_for('static', filename='person_uncolored.png') }}" alt="">{% endfor %}</div>
+                                     </div>
+                                 </div>
+                                 {% endfor %}
+                             </div>
+                        </div>
+                         <!-- PP Card -->
+                        <div class="metric-card">
+                            <h5>Predictive Parity <span class="info-icon" title="Checks if the accuracy of positive predictions (Precision) is similar across groups. That is, when the model predicts the 'positive' outcome, is it correct equally often for all groups?">(?)</span></h5>
+                             {% set pp_values = [] %}{% for group_name, metrics_val in current_groups_data_step6.items() %}{% set pp_val = metrics_val.get('Predictive Parity') %}{% if pp_val is number and pp_val == pp_val %}{% set _ = pp_values.append(pp_val) %}{% endif %}{% endfor %}
+                             {% if pp_values and pp_values|length > 1 %}{% set diff_pp = (pp_values | max) - (pp_values | min) %}<p class="disparity-summary">Max Precision Difference: <strong>{{"%.3f"|format(diff_pp)}}</strong></p>{% endif %}
+                             <div class="metric-group-breakdown">
+                                 {% for group_name, current_metrics_item in current_groups_data_step6.items() %}
+                                 <div class="metric-group-item">
+                                     <span class="group-name">{{ group_name }}</span>
+                                     <div style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color); margin-bottom: 10px;">{{"%.3f"|format(current_metrics_item.get('Predictive Parity', 0))}}</div>
+                                     <div class="icon-viz-container">
+                                          <p class="viz-description">Precision: Correct '{{ "Approvals" if outcome_polarity == 'positive' else "High Risk predictions"}}' (of 10 predicted as such):</p>
+                                          {% set pp_value_item = current_metrics_item.get('Predictive Parity', 0) %}{% set num_colored_pp = (pp_value_item * 10) | round | int %}
+                                          <div class="person-icons">{% for i in range(10) %}<img class="person-img-icon" src="{{ url_for('static', filename='person_colored.png') if i < num_colored_pp else url_for('static', filename='person_uncolored.png') }}" alt="">{% endfor %}</div>
+                                     </div>
+                                 </div>
+                                 {% endfor %}
+                             </div>
+                        </div>
+                    </div>
+                </div>
+             </div>
+             <h3>Interpreting Equalized Odds and Predictive Parity:</h3>
+            <h4>Equalized Odds <span class="info-icon" title="This means the model should work equally well for people who genuinely deserve the 'positive' outcome AND for people who genuinely deserve the 'negative' outcome, across all groups.">(?)</span></h4>
+            <p>This metric looks at two important rates:
+                <ul>
+                    <li><strong>True Positive Rate (TPR) - Shown Above:</strong> Of those who <em>actually should receive</em> the positive outcome (e.g., truly eligible for loan approval), what fraction does the model correctly identify? We want this to be high and similar across groups. If TPR for 'Area A' is 0.80 and for 'Area B' is 0.65, it means qualified applicants from 'Area B' are being missed by the model more often.</li>
+                    <li><strong>False Positive Rate (FPR) - In Detailed Table:</strong> Of those who <em>actually should receive</em> the negative outcome (e.g., should be rejected for the loan), what fraction does the model incorrectly predict for the positive outcome? We want this to be low and similar across groups. A high FPR for one group means they are receiving undeserved positive outcomes more often. (You'd find FPR values in the "Detailed Group Metrics" table on the full results page).</li>
+                </ul>
+            </p>
+            <p><strong>When might Equalized Odds be a priority?</strong> Consider a model predicting eligibility for a medical treatment where 'positive outcome' means "eligible for treatment".
+                <br><em>Equal TPR is important because:</em> We'd want patients from all demographic groups who genuinely *need* the treatment (True Positive case) to be correctly identified by the model at similar rates. If TPR is lower for one group, it means they are being unfairly overlooked for a necessary treatment.
+                <br><em>Equal FPR is important because:</em> We'd also want patients from all groups who *do not* need the treatment (and for whom it might be unnecessary or even harmful - True Negative case) to be incorrectly flagged as needing it (False Positive case) at similar, very low rates. A higher FPR for one group could expose them to needless risks or costs.
+            </p>
+
+            <h4>Predictive Parity (also known as Precision) <span class="info-icon" title="This checks if a 'positive' prediction from the model means the same thing, or is equally reliable, across different groups.">(?)</span></h4>
+            <p>This metric asks: when the model predicts the outcome you've defined as 'positive' (e.g., "Approved"), how often is that prediction actually correct?
+                In our housing example, if Predictive Parity for 'Area A' is 0.88 and for 'Area B' is 0.75, it means that when an application from 'Area A' is predicted as 'Approved', it's an actual good case (True=1) 88% of the time. But for 'Area B', such a prediction is only correct 75% of the time.
+            </p>
+            <p><strong>When might Predictive Parity be a priority?</strong> In a hiring context, imagine a model predicts a candidate is 'Highly Recommended'. Predictive Parity would examine: 'Of those recommended by the model, are candidates from different gender groups actually good hires (True=1) at similar rates?' If precision is much lower for women, it means a 'Highly Recommended' label for a woman is less reliable (more likely to be an incorrect positive prediction) than for a man. This could lead to wasted interview resources for one group or build distrust in the model's recommendations for them.
+            </p>
+             <p>Click "Next" to learn about Feature Budgeting.</p>
+        {% endif %}
+
+        {# --- Step 7: Feature Budgeting Explained --- #}
+        {% if step == 7 %}
+            <h2>Step 7: Understanding Feature Budgeting & Importance</h2>
+            <p>The sidebar on the results page allows you to adjust model complexity for specific groups using 'Feature Budgeting'. This is only applicable when training a new model (not for uploaded models).</p>
+             <div class="highlight-section">
+                 <h3>Example: Budgeting for 'Neighbourhood'</h3>
+                 <div class="onboarding-controls">
+                     <label class="budget-enable-label"><input type="checkbox" checked disabled> Budget for 'Neighbourhood'</label>
+                     <div class="budget-groups active">
+                         {% set attribute_key = protected_cols[0] %}
+                         {% set groups = current_fairness_results[attribute_key]['groups'].keys() %}
+                         {% for group_name in groups %}
+                             {% set current_budget_val = budget_applied_info.settings.get(attribute_key, {}).get(group_name) %}
+                             <div class="budget-group-item">
+                                  <span class="budget-group-label" title="{{ group_name }}">{{ group_name }}:</span>
+                                  <input type="number" value="{{ current_budget_val if current_budget_val is number and current_budget_val >=0 else '' }}" placeholder="All (no limit)" readonly style="background-color:#eee; width: 100px;">
+                             </div>
+                             <div class="importance-list-container">
+                                  {% set importance_list_val = group_importances_display.get(attribute_key, {}).get(group_name, []) %}
+                                 {% if importance_list_val %}<h6>Top Features (PI Score):</h6><ol style="font-size:0.85em;">{% set count = namespace(value=0) %}{% for feature, score in importance_list_val %}{% if count.value < 3 %}<li>{{ feature }} ({{ "%.2f"|format(score) }})</li>{% set count.value = count.value + 1 %}{% endif %}{% endfor %}{% if count.value == 0 %}<li>(N/A)</li>{% endif %}</ol>{% else %}<span style="font-size:0.8em; color:#777;">(PI not shown for this example)</span>{% endif %}
+                             </div>
+                         {% endfor %}
+                     </div>
+                 </div>
+             </div>
+             <h3>How it Works:</h3>
+             <p>When you enable budgeting for an attribute (like Neighbourhood) and re-run the analysis with a new model training:</p>
+             <ol>
+                 <li>The dashboard first calculates <strong>Permutation Importance (PI)</strong> for each feature, specifically *within each group*. PI measures how much the model's accuracy drops for that group when a particular feature's values are randomly shuffled. A large drop suggests the feature is important for making predictions for that group.</li>
+                 <li>The top features, based on their PI scores, are shown for each group (e.g., 'Area A', 'Area B').</li>
+                 <li>You can then enter a number (the "budget") to limit how many of these top features are used when making predictions *for that specific group*. For instance, setting a budget of '3' for 'Area A' means only the top 3 most important features for Area A will be used for applicants from Area A. Other features will effectively be ignored (zeroed out) for them.</li>
+                 <li>If you leave the budget blank or it's not a valid number, all selected model features are used for that group.</li>
+             </ol>
+             <p><strong>Why use Feature Budgeting?</strong> Sometimes, using fewer, more targeted features for certain groups can help reduce disparities in fairness metrics. This might come at the cost of some overall accuracy or group-specific accuracy, so it's a trade-off to consider. It allows for exploring simpler, potentially more interpretable models for those groups.</p>
+             <p>Click "Next" to learn about Proxy Analysis.</p>
+        {% endif %}
+
+         {# --- Step 8: Proxy Analysis Explained --- #}
+        {% if step == 8 %}
+            <h2>Step 8: Understanding Proxy Analysis</h2>
+            <p>Even if you don't use protected attributes like 'Neighbourhood' directly as model features, other features in your model might be highly correlated with them. These are sometimes called "proxy" features. If not carefully considered, they can lead to indirect or unintentional bias.</p>
+             <div class="highlight-section">
+                <h3>Example: Proxy Analysis Results for 'Neighbourhood'</h3>
+                 <p>This optional analysis (which you can enable in the sidebar on the results page) checks for statistical correlations between your chosen model features and the protected attributes.</p>
+                 {% set p_attr = protected_cols[0] %}
+                 {% set results = proxy_analysis_results[p_attr] %}
+                 <div class="accordion-item active">
+                    <div class="accordion-header">Correlations with: {{ p_attr.replace('_',' ').title() }}</div>
+                     <div class="accordion-content">
+                         <table class="detail-table">
+                             <thead><tr><th>Feature</th><th>Test Type</th><th>Value</th><th>p-value</th><th>Significant</th><th>Subgroup Details (Mean/Mode)</th></tr></thead>
+                             <tbody>
+                                 {% for feature, stats in results.items() %}
+                                     <tr class="{{ 'significant-row' if stats.significant else '' }}" {% if stats.significant %}title="Potentially significant proxy"{% endif %}>
+                                         <td>{{ feature }}</td><td>{{ stats.test_type }}</td>
+                                         <td class="metric-value">{% if stats.value is number %}{{ "%.3f"|format(stats.value) }}{% else %}N/A{% endif %}</td>
+                                         <td class="metric-value">{% if stats.test_type == "ANOVA" and stats.p_value is number %}{{ "%.3f"|format(stats.p_value) }}{% else %}-{% endif %}</td>
+                                         <td class="{% if stats.significant %}significant-yes{% endif %}">{{ 'Yes' if stats.significant else 'No' }}</td>
+                                         <td class="subgroup-detail-item" style="font-size:0.85em;">{% if stats.subgroup_details %}{% for group, detail in stats.subgroup_details.items() %}<div><strong>{{ group }}:</strong> {{ detail if detail is not number else "%.1f"|format(detail) }}</div>{% endfor %}{% elif stats.significant %}(N/A){% else %}-{% endif %}</td>
+                                     </tr>
+                                 {% endfor %}
+                             </tbody>
+                         </table>
+                     </div>
+                 </div>
+             </div>
+            <h3>How it Works & Interpretation:</h3>
+            <ul>
+                <li><strong>ANOVA:</strong> Used for numeric features (like `income_k`). It tests if the *average* value of that feature differs significantly across the groups of the protected attribute. A low p-value (typically < 0.05) suggests a significant difference.</li>
+                <li><strong>Cramer's V:</strong> Used for categorical features (like `has_guarantor`). It measures the *strength* of association between the feature and the protected attribute, with values ranging from 0 (no association) to 1 (perfect association). A value > 0.15 or 0.2 might suggest a noteworthy correlation in many contexts.</li>
+                <li><strong>Significant = 'Yes':</strong> This flag indicates that the feature shows a statistical relationship with the protected attribute, suggesting it might be acting as a proxy. In the example, `income_k` is significantly correlated with `neighbourhood` because the average income differs greatly between Area A and B.</li>
+                <li><strong>Subgroup Details:</strong> These show the average value (for ANOVA) or the most common category (mode, for Cramer's V) of the feature within each group of the protected attribute. This helps in understanding the nature of the correlation.</li>
+            </ul>
+            <p>Identifying strong proxies allows you to make more informed decisions. You might consider whether to keep, transform, or remove such features to reduce potential indirect bias, or simply to be more aware of their influence on the model's behavior across groups.</p>
+            <p>Click "Next" to explore cross-attribute distributions.</p>
+        {% endif %}
+
+        {# --- Step 9: Cross-Attribute Distribution Analysis --- #}
+        {% if step == 9 %}
+            <h2>Step 9: Exploring Intersections with Pie Charts</h2>
+            <p>The dashboard offers a way to see how different subgroups intersect. This can help you understand if fairness issues are more pronounced in specific combinations of protected attributes (e.g., for a particular gender within a particular age group).</p>
+            <div class="highlight-section">
+                <h3>Example: Distribution by 'Applicant Type' within 'Neighbourhood' Groups</h3>
+                <p>For each protected attribute you're analyzing (e.g., 'Neighbourhood'), and for different fairness-related outcomes (like who was 'Predicted for Approval' or who was a 'False Negative'), you can see a pie chart breakdown. This breakdown shows how those individuals are distributed across your *other* selected protected attributes (e.g., 'Applicant Type').</p>
+                {% set primary_attr_pie = protected_cols[0] %} {# neighbourhood #}
+                {% set other_attr_pie = protected_cols[1] %} {# applicant_type #}
+                {% set group_name_pie_example = 'Area A' %}
+                {% set metric_name_pie_example = 'Demographic Parity' %} {# Focusing on "Predicted Approval" (which is 'non_outliers' for DP in the pie chart data structure) #}
+
+                <div class="accordion-item active">
+                    <div class="accordion-header">{{ primary_attr_pie | title }}: {{ metric_name_pie_example }} Distributions</div>
+                    <div class="accordion-content">
+                         <h4>Distribution for "Predicted '{{ "Approved" if outcome_polarity == "positive" else "High Risk"}}'" Cases</h4>
+                         <h5>Group: {{ group_name_pie_example }}</h5>
+                         <div class="mock-pie-chart-container">
+                            <h6>Distribution by {{ other_attr_pie | title }}</h6>
+                            <div class="mock-pie-chart"></div>
+                            <p>(Example: 60% Family, 40% Single)</p>
+                         </div>
+                         <p style="font-size:0.9em; text-align:center; margin-top: 15px;">
+                            This (mock) pie chart would illustrate: for applicants from '{{ group_name_pie_example }}' who were predicted by the model as '{{ "Approved" if outcome_polarity == "positive" else "High Risk"}}', what is their breakdown by '{{ other_attr_pie | title }}'?
+                         </p>
+                    </div>
+                </div>
+            </div>
+            <h3>Interaction and Interpretation:</h3>
+            <ul>
+                <li>On the actual results page, these pie charts are found within each protected attribute's main expandable section, under "Cross-Attribute Distribution Analysis." They are further organized by the fairness concept they relate to (Demographic Parity, Equalized Odds, Predictive Parity).</li>
+                <li>Each pie chart shows the composition of individuals for a specific fairness outcome (e.g., True Positives, False Negatives, or overall Predicted Positives) within one group of the primary attribute (e.g., 'Area A' of 'Neighbourhood'), broken down by a secondary protected attribute (e.g., 'Applicant Type').</li>
+                <li><strong>Interactive Detail:</strong> A key feature on the results page is that you can <strong>click on a segment of any pie chart</strong>. Doing so will open a pop-up window (a modal) showing a table with details of the individuals who fall into that specific intersectional segment. For example, clicking the 'Family' segment in the mock chart above would show you the list of 'Family' applicants from 'Area A' who were predicted as '{{ "Approved" if outcome_polarity == "positive" else "High Risk"}}'.</li>
+                <li>This helps identify if particular intersectional groups (e.g., "Single applicants from Area B") are disproportionately experiencing certain outcomes, which might be missed when looking at single protected attributes in isolation.</li>
+            </ul>
+            <p>Click "Next" to learn about tracking your analysis runs.</p>
+        {% endif %}
+
+        {# --- Step 10: Reviewing Run History --- #}
+        {% if step == 10 %}
+            <h2>Step 10: Tracking Changes with Run History</h2>
+            <p>As you experiment by changing model types, features, or budgeting options, the dashboard keeps a history of your analysis runs. This allows you to compare results and see how your adjustments impact both accuracy and fairness metrics.</p>
+            <div class="highlight-section">
+                <h3>Accessing and Understanding Run History</h3>
+                <p>On the results page, within each protected attribute's main expandable section (e.g., for 'Neighbourhood'), you'll find a button like this:</p>
+                <div style="text-align:center; margin: 15px 0;">
+                    <span class="mock-history-button">
+                        <img src="{{ url_for('static', filename='history_icon.png') }}" alt="">
+                        View Run History
+                    </span>
+                </div>
+                <p>Clicking this button opens a pop-up window with a line chart. This chart visualizes how key metrics have changed across your different analysis runs, specifically for the protected attribute whose section you are in. The metrics typically tracked include:</p>
+                <ul>
+                    <li>Overall Model Accuracy</li>
+                    <li>Demographic Parity (Max Difference between groups)</li>
+                    <li>Equalized Odds (Overall Score, which is the max gap in TPR or FPR)</li>
+                    <li>Predictive Parity (Max Difference in Precision between groups)</li>
+                </ul>
+                <div class="mock-history-chart-container">
+                    <p style="font-weight:bold; margin-bottom:5px;">Example History Chart (Conceptual)</p>
+                    <img src="data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22300%22%20height%3D%22150%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Crect%20width%3D%22300%22%20height%3D%22150%22%20fill%3D%22%23f0f0f0%22/%3E%3Ctext%20x%3D%22150%22%20y%3D%2225%22%20font-family%3D%22Arial%22%20font-size%3D%2212%22%20fill%3D%22%23333%22%20text-anchor%3D%22middle%22%3EMetrics%20vs%20Run%20Number%3C/text%3E%3Cpath%20d%3D%22M20%20120%20Q%2070%2080%20120%20100%20T%20220%2070%20280%2090%22%20stroke%3D%22blue%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-dasharray%3D%225%2C2%22/%3E%3Cpath%20d%3D%22M20%20100%20Q%2080%20110%20130%2080%20T%20210%20100%20280%2070%22%20stroke%3D%22green%22%20stroke-width%3D%222%22%20fill%3D%22none%22/%3E%3Ctext%20x%3D%22150%22%20y%3D%22140%22%20font-family%3D%22Arial%22%20font-size%3D%2210%22%20fill%3D%22%23555%22%20text-anchor%3D%22middle%22%3E(Lines%20for%20Accuracy%2C%20DP%2C%20EO%2C%20PP%20would%20be%20here)%3C/text%3E%3C/svg%3E" alt="Conceptual sketch of a line chart showing metrics over runs.">
+                </div>
+                <p>When you hover over a point on a line in the actual chart, a tooltip will appear. This tooltip displays the exact metric value for that run and, importantly, shows the configuration details for that run (e.g., model type, parameters used, number of features, budgeting settings). This makes it easy to see how your choices affect both fairness and accuracy over time.</p>
+            </div>
+            <p>This feature is very helpful for systematically exploring the impact of different modeling decisions and finding configurations that better meet your goals.</p>
+            <p>Click "Next" for the final step on iterating and exploring.</p>
+        {% endif %}
+
+        {# --- Step 11: Iterate and Explore --- #}
+        {% if step == 11 %}
+            <h2>Step 11: Iterate, Explore, and Define Your Approach</h2>
+            <p>The Fairness Analysis Dashboard is a tool to support an iterative process of exploration and informed decision-making, not a one-click solution to "fix" fairness.</p>
+            <div class="highlight-section">
+                <h3>Guiding Your Fairness Analysis:</h3>
+                <ul>
+                    <li><strong>Define Your Goals First:</strong> Before diving deep into metrics, consider what fairness means for your specific application.
+                        <ul>
+                            <li>What are the potential harms of an unfair model in your context (e.g., denying deserving applicants, unfairly targeting individuals)?</li>
+                            <li>Which groups are you most concerned about?</li>
+                            <li>What kind of fairness outcomes are you aiming for, and are there any legal or ethical guidelines you need to follow?</li>
+                        </ul>
+                    </li>
+                    <li><strong>Select Appropriate Metrics:</strong> Based on your goals, choose the fairness metrics that are most relevant. For example:
+                        <ul>
+                            <li>If ensuring equal selection rates is a priority (perhaps for initial screening), <strong>Demographic Parity</strong> might be key.</li>
+                            <li>If you need the model to perform equally well for those who do and do not qualify for an outcome, across all groups, <strong>Equalized Odds</strong> (looking at both TPR and FPR) is important.</li>
+                            <li>If the reliability of a "positive" prediction needs to be consistent across groups, <strong>Predictive Parity</strong> (Precision) is a good focus.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Iterate and Experiment:</strong> Use the "Analysis Controls" sidebar on the results page (which you saw mocked up earlier) to try different approaches:
+                        <ul>
+                            <li>Switch model types (e.g., Logistic Regression vs. SVM).</li>
+                            <li>Adjust model hyperparameters.</li>
+                            <li>Change the set of model features.</li>
+                            <li>Use Feature Budgeting to simplify models for certain groups.</li>
+                            <li>Turn Proxy Analysis on or off to understand feature correlations.</li>
+                        </ul>
+                        After each change, re-run the analysis and observe the impact.
+                    </li>
+                    <li><strong>Understand Trade-offs:</strong> Improving one fairness metric might sometimes negatively affect another, or impact overall model accuracy. For example, making a model simpler for one group through Feature Budgeting might improve a fairness metric but slightly lower accuracy for that group or overall. Recognize that achieving perfect scores on all fairness metrics simultaneously is often mathematically impossible. The goal is to find a balance that aligns with your defined objectives.</li>
+                    <li><strong>Context is Key:</strong> The "best" configuration depends on your specific use case and what trade-offs are acceptable. Use the dashboard's insights to facilitate discussions with stakeholders and make well-reasoned decisions. This tool provides data; the decisions about what is acceptable or preferable remain with you and your team.</li>
+                     <li><strong>Use Run History:</strong> Refer to the Run History (Step 10) to systematically track your experiments and understand which configurations led to outcomes that best meet your defined fairness and performance goals.</li>
+                </ul>
+            </div>
+            <p>This concludes the onboarding tour! You now have an overview of the dashboard's main features. Click "Finish" to go to the main page, upload your own dataset, and begin your fairness analysis journey.</p>
+        {% endif %}
+
+
+        {# --- Navigation --- #}
+        <div class="onboarding-nav">
+            {% if step > 1 %}
+                <a href="{{ url_for('onboarding_step', step=step-1) }}" class="nav-button back">« Back</a>
+            {% else %}
+                 <a href="{{ url_for('dashboard') }}" class="nav-button back" style="background-color: var(--secondary-color); visibility: visible;">Skip Onboarding</a>
+            {% endif %}
+
+            {% if step < total_steps %}
+                <a href="{{ url_for('onboarding_step', step=step+1) }}" class="nav-button next">Next »</a>
+            {% else %}
+                <a href="{{ url_for('dashboard') }}" class="nav-button finish">Finish Onboarding (Go to Dashboard)</a>
+            {% endif %}
+        </div>
+
+    </div> {# End Container #}
+
+<script>
+    // Simple script to toggle mock parameter sections in Step 3
+    document.addEventListener('DOMContentLoaded', function() {
+        if ({{ step }} === 3) {
+            const modelTypeRadios = document.querySelectorAll('input[name="model_type_onboarding"]');
+            const lrParamsMock = document.getElementById('mock_lr_params');
+            const svmParamsMock = document.getElementById('mock_svm_params');
+            const uploadParamsMock = document.getElementById('mock_upload_params');
+
+            function toggleMockParams() {
+                const selectedType = document.querySelector('input[name="model_type_onboarding"]:checked').value;
+                if (lrParamsMock) lrParamsMock.style.display = (selectedType === 'new_lr') ? 'block' : 'none';
+                if (svmParamsMock) svmParamsMock.style.display = (selectedType === 'new_svm') ? 'block' : 'none';
+                if (uploadParamsMock) uploadParamsMock.style.display = (selectedType === 'upload') ? 'block' : 'none';
+            }
+
+            modelTypeRadios.forEach(radio => {
+                radio.addEventListener('change', toggleMockParams);
+            });
+            // Initial call
+            toggleMockParams();
+        }
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+:host {
+  width: 100%;
+}
+
+.class-performance {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  &__label {
+    color: var(--color-deeptrust);
+    font-family: prompt-button, sans-serif;
+    margin-bottom: 0.5rem;
+  }
+}

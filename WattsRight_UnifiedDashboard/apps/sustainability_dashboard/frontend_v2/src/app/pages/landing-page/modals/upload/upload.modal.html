@@ -1,0 +1,60 @@
+<div class="upload-container" data-bs-backdrop="static">
+  <h2>{{ 'What do you want to analyze?' | uppercase }}</h2>
+  <form class="upload-container__form" (ngSubmit)="submitForm()">
+
+    <div class="upload-container__form__section">
+      <h2 class="upload-container__form__section__title">{{ 'Model Source' | uppercase }}</h2>
+
+      <div class="upload-container__form__section__inputs model">
+        <app-form-input-text
+          [label]="''"
+          [placeholder]="'Enter the name of the HuggingFace model'"
+          [control]="uploadFormGroup.controls.huggingfaceModel"
+          [required]="true"
+        />
+
+        <div class="or">
+          <hr>
+          <span>or</span>
+        </div>
+
+        <div class="model-upload">
+          <h2>{{ 'Upload model file' | uppercase }}</h2>
+
+          <app-form-input-file
+            [placeholder]="'Upload model'"
+            [control]="uploadFormGroup.controls.h5Model"
+            [required]="true"
+          />
+        </div>
+
+        <div class="error-message" *ngIf="neitherFieldFilledError">
+          Please provide either a Hugging Face URL or upload an H5 model.
+        </div>
+
+        <div class="error-message" *ngIf="bothFieldsFilledError">
+          Please provide either a Hugging Face URL or upload an H5 model, not both.
+        </div>
+      </div>
+    </div>
+
+    <div class="upload-container__form__section dataset-section">
+      <h2>{{ 'Dataset (Required)' | uppercase }}</h2>
+
+      <app-form-input-file
+        [placeholder]="'Upload dataset'"
+        [control]="uploadFormGroup.controls.dataset"
+        [required]="true"
+      />
+
+      <span>Used to measure the model's performance before and after optimization</span>
+    </div>
+
+    <button
+      type="submit"
+      appButton
+      [ecogreen]="true"
+      [disabled]="uploadFormGroup.invalid">Run analysis
+    </button>
+  </form>
+</div>

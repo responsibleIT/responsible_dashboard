@@ -1,0 +1,14 @@
+@font-face {
+  font-family: prompt;
+  src: url("Prompt-Regular.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: prompt-button;
+  src: url("Prompt-Bold.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: prompt-header;
+  src: url("Prompt-ExtraBold.ttf") format("truetype");
+}

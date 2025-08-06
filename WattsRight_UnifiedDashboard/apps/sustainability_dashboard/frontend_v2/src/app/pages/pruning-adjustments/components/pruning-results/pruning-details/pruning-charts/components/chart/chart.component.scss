@@ -1,0 +1,84 @@
+:host {
+  width: 100%;
+  height: 100%;
+  display: flex; // Changed from block to flex
+  flex-direction: column; // Stack content vertically
+}
+
+.chart-container {
+  width: 100%;
+  height: 100%;
+  flex: 1; // Allow container to grow
+  box-sizing: border-box;
+  min-height: 0; // Important for flex children
+}
+
+#chart > ::ng-deep svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#chart {
+  width: 100%;
+  height: 100%;
+
+  .axis text {
+    font-family: sans-serif;
+    font-size: 11px;
+    color: #555;
+  }
+
+  .axis path,
+  .axis line {
+    stroke: #ccc;
+  }
+
+  .axis--x text {
+    text-anchor: middle;
+    font-size: 11px;
+  }
+
+  // Grid lines
+  .grid {
+    .domain {
+      stroke: none;
+    }
+
+    line {
+      stroke: #e0e0e0;
+      stroke-opacity: 0.7;
+      shape-rendering: crispEdges;
+    }
+  }
+
+  // Mouse tracking elements
+  .mouse-over-effects {
+    .mouse-line {
+      pointer-events: none;
+    }
+  }
+}
+
+/* Tooltip styles - CHANGED */
+// All tooltip styling is now managed here instead of inline in the component TS.
+.chart-tooltip {
+  // Positional styles
+  position: absolute;
+  pointer-events: none;
+  z-index: 1000;
+
+  // Appearance styles
+  background-color: var(--color-white);
+  border-radius: 6px; // Added for rounded corners
+  padding: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+
+  // Font styles
+  color: #333; // Changed from white for readability on white background
+  font-family: sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  max-width: 200px;
+  white-space: nowrap;
+}

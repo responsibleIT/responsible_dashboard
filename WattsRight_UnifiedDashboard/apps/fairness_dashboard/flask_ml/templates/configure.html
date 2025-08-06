@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configure Analysis - Fairness Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- Base & Variables --- */
+        :root {
+            --primary-color: #007bff;
+            --primary-light: #e7f3ff;
+            --secondary-color: #6c757d;
+            --success-color: #198754;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --light-gray: #f8f9fa;
+            --medium-gray: #dee2e6;
+            --dark-gray: #6c757d;
+            --text-color: #343a40;
+            --card-bg: #ffffff;
+            --body-bg: #f4f7f6;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --font-family-sans-serif: 'Inter', sans-serif;
+        }
+        body {
+            font-family: var(--font-family-sans-serif);
+            line-height: 1.6;
+            padding: 30px 20px;
+            background-color: var(--body-bg);
+            color: var(--text-color);
+            margin: 0;
+            position: relative; /* Needed for absolute positioning of overlay */
+        }
+        .container {
+             max-width: 800px;
+             margin: auto;
+             position: relative; /* Context for overlay */
+             z-index: 1; /* Ensure form is below overlay when active */
+        }
+        h1 { text-align: center; color: #333; margin-bottom: 15px; font-weight: 700; }
+        p.intro-text { text-align: center; color: var(--dark-gray); margin-bottom: 30px; font-size: 1.05rem; }
+        a { color: var(--primary-color); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        hr { border: 0; border-top: 1px solid #eee; margin: 30px 0; }
+
+        /* Form Styling */
+        form {
+            background-color: var(--card-bg);
+            padding: 30px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            border: 1px solid var(--medium-gray);
+            position: relative; /* Context for overlay */
+        }
+        .form-section {
+            margin-bottom: 25px;
+            padding-bottom: 25px;
+            border-bottom: 1px solid #eee;
+        }
+        .form-section:last-of-type {
+             border-bottom: none;
+             margin-bottom: 0;
+             padding-bottom: 0;
+        }
+
+        label.section-label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #495057;
+        }
+        select, input[type="text"], input[type="number"], input[type="file"], .checkbox-group, .radio-group {
+            padding: 10px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 1rem;
+            background-color: #fff;
+            margin-bottom: 5px;
+        }
+        select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 16px 12px; }
+
+        .checkbox-group { max-height: 220px; overflow-y: auto; }
+        .checkbox-group label, .radio-group label {
+            font-weight: normal;
+            display: flex;
+            align-items: flex-start; /* Align radio button with top of text */
+            margin-bottom: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+        .checkbox-group input[type="checkbox"], .radio-group input[type="radio"] {
+            margin-right: 10px;
+            transform: scale(1.1);
+            flex-shrink: 0;
+             margin-top: 0.2em; /* Adjust vertical alignment slightly if needed */
+        }
+        .checkbox-group label span, .radio-group label span {
+            flex-grow: 1; /* Allow text to take remaining space */
+            line-height: 1.4; /* Adjust line height for readability */
+        }
+
+        .form-section small { display: block; margin-top: 8px; font-size: 0.85rem; color: var(--dark-gray); }
+
+        /* Hyperparameter & Upload Sections */
+        .hyperparameter-section, .upload-model-options {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            border: 1px dashed var(--medium-gray);
+            border-radius: 6px;
+            background-color: #fdfdfd;
+        }
+        .hyperparameter-section h5, .upload-model-options h5 {
+            font-size: 1rem; margin-top: 0; margin-bottom: 10px; color: #333;
+        }
+        .hyperparameter-section label, .upload-model-options label { /* Apply to both */
+            font-weight: 500;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            display: block;
+            align-items: initial; /* Reset alignment for labels inside here */
+        }
+         .hyperparameter-section select,
+         .hyperparameter-section input[type="text"],
+         .hyperparameter-section input[type="number"],
+         .upload-model-options input[type="file"] { /* Apply to file inputs as well */
+             width: 100%; /* Make file inputs full width like others in this section */
+             min-width: 100px;
+             margin-bottom: 10px;
+             font-size: 0.95rem;
+             padding: 8px 10px;
+             border: 1px solid #ccc;
+             border-radius: 4px;
+             background-color: #fff;
+             box-sizing: border-box;
+             /* display: inline-block; Removed for full width */
+             vertical-align: middle;
+         }
+        .hyperparameter-section select {
+             min-width: 180px;
+             width: auto; /* Allow select to be auto-width for solvers/kernels */
+        }
+         .hyperparameter-section input[type="text"],
+         .hyperparameter-section input[type="number"] {
+            width: auto; /* Allow C value inputs to be auto-width */
+         }
+
+        .hyperparameter-section small, .upload-model-options small {
+            margin-top: 0; margin-bottom: 10px; display: block; clear: both;
+        }
+
+        .upload-model-options p.current-file {
+            font-size: 0.85rem;
+            color: var(--secondary-color);
+            margin-top: -5px;
+            margin-bottom: 10px;
+        }
+
+
+        /* Button */
+        .submit-button {
+            padding: 12px 25px; background: linear-gradient(to bottom, var(--success-color), #146c43); color: white; border: none; border-radius: var(--border-radius); cursor: pointer; font-size: 1.1rem; font-weight: 600; transition: background 0.3s ease, opacity 0.3s ease; width: 100%; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .submit-button:hover { background: linear-gradient(to bottom, #146c43, #0f5132); }
+        /* Style for button when loading */
+        .submit-button.loading {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        /* Flash Messages */
+        .flash-container { margin-bottom: 20px; }
+        .flash { padding: 12px 15px; border-radius: 4px; border: 1px solid transparent; font-size: 0.95rem; text-align: left;}
+        .flash.error { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+        .flash.warning { background-color: #fff3cd; color: #856404; border-color: #ffeeba; }
+        .flash.info { background-color: #d1ecf1; color: #0c5460; border-color: #bee5eb; }
+
+        /* Footer Link */
+        .footer-link { text-align: center; margin-top: 25px; }
+        .footer-link a { color: var(--secondary-color); font-weight: 600;}
+
+        /* Disabled Label Style */
+        label.disabled-label { opacity: 0.6; cursor: not-allowed; }
+        label.disabled-label span { }
+
+        /* --- Loading Indicator Styles --- */
+        #loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white overlay */
+            display: none; /* Hidden by default */
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 10; /* Ensure it's above the form content */
+            border-radius: var(--border-radius);
+            text-align: center;
+        }
+        .spinner {
+            border: 6px solid var(--light-gray);
+            border-top: 6px solid var(--primary-color);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        #loading-text {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* --- END: Loading Indicator Styles --- */
+
+        .data-guidance-note {
+            background-color: var(--primary-light);
+            color: var(--text-color);
+            border: 1px solid var(--primary-color);
+            border-left-width: 4px;
+            border-radius: var(--border-radius);
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        .data-guidance-note p {
+            margin: 0;
+            line-height: 1.5;
+        }
+        .data-guidance-note strong:first-child { /* Style the "Important:" part */
+            color: var(--primary-color);
+        }
+        /* --- END: Data Guidance Note Style --- */
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Configure Fairness Analysis</h1>
+        <p class="intro-text">Select model, target variable, outcome meaning, protected attributes, and features from your uploaded dataset.</p>
+
+        <div class="data-guidance-note">
+            <p><strong>Important:</strong> When training a new model here, ensure the dataset you've uploaded is for <strong>training and validation only</strong>. Do not upload test data to avoid data leakage and maintain the integrity of your model evaluation. When using a pre-trained model, the dataset uploaded is used for evaluation.</p>
+        </div>
+
+
+        <div class="flash-container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        {% if columns %}
+            {% if prev_config is defined %}
+            <form action="{{ url_for('train_and_evaluate') }}" method="post" id="config-form" enctype="multipart/form-data">
+
+                <div class="form-section">
+                   <label class="section-label">1. Select Model</label>
+                    <div class="radio-group" id="model-type-group">
+                        {% set current_model_type_selected = session.get('model_config', {}).get('type', 'logistic_regression') %}
+                        <label>
+                            <input type="radio" name="model_type" value="logistic_regression"
+                                   {% if current_model_type_selected == 'logistic_regression' %}checked{% endif %}
+                                   onclick="showModelOptions('logistic_regression')">
+                            <span>Logistic Regression (Train New)</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="model_type" value="svm"
+                                   {% if current_model_type_selected == 'svm' %}checked{% endif %}
+                                   onclick="showModelOptions('svm')">
+                            <span>Support Vector Machine (SVM) (Train New)</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="model_type" value="upload_model"
+                                   {% if current_model_type_selected == 'upload_model' %}checked{% endif %}
+                                   onclick="showModelOptions('upload_model')">
+                            <span>Upload Pre-trained Model</span>
+                        </label>
+                    </div>
+
+                    <div class="hyperparameter-section" id="params-logistic_regression">
+                        <h5>Logistic Regression Parameters</h5>
+                        <label for="lr_c">Regularization Strength (C)</label>
+                        <input type="text" inputmode="decimal" name="lr_c" id="lr_c" value="{{ prev_config.get('model_config', {}).get('params', {}).get('C', 1.0) }}" pattern="[0-9]*\.?[0-9]+">
+                        <small>Inverse of regularization strength (e.g., 0.1, 1.0, 10). Must be positive.</small>
+                        <label for="lr_solver">Solver</label>
+                        <select name="lr_solver" id="lr_solver">
+                            {% set current_lr_solver = prev_config.get('model_config', {}).get('params', {}).get('solver', 'lbfgs') %}
+                            <option value="lbfgs" {% if current_lr_solver == 'lbfgs' %}selected{% endif %}>lbfgs (default)</option>
+                            <option value="liblinear" {% if current_lr_solver == 'liblinear' %}selected{% endif %}>liblinear</option>
+                            <option value="saga" {% if current_lr_solver == 'saga' %}selected{% endif %}>saga</option>
+                        </select>
+                        <small>Algorithm to use in the optimization problem.</small>
+                    </div>
+                    <div class="hyperparameter-section" id="params-svm">
+                         <h5>SVM Parameters</h5>
+                         <label for="svm_c">Regularization Parameter (C)</label>
+                         <input type="text" inputmode="decimal" name="svm_c" id="svm_c" value="{{ prev_config.get('model_config', {}).get('params', {}).get('C', 1.0) }}" pattern="[0-9]*\.?[0-9]+">
+                         <small>Penalty parameter C (e.g., 0.1, 1.0, 10). Must be positive.</small>
+                         <label for="svm_kernel">Kernel Type</label>
+                         <select name="svm_kernel" id="svm_kernel">
+                             {% set current_svm_kernel = prev_config.get('model_config', {}).get('params', {}).get('kernel', 'rbf') %}
+                             <option value="rbf" {% if current_svm_kernel == 'rbf' %}selected{% endif %}>rbf (default)</option>
+                             <option value="linear" {% if current_svm_kernel == 'linear' %}selected{% endif %}>linear</option>
+                             <option value="poly" {% if current_svm_kernel == 'poly' %}selected{% endif %}>poly</option>
+                             <option value="sigmoid" {% if current_svm_kernel == 'sigmoid' %}selected{% endif %}>sigmoid</option>
+                         </select>
+                         <small>Specifies the kernel type to be used in the algorithm.</small>
+                    </div>
+                    <div class="upload-model-options" id="options-upload_model">
+                         <h5>Upload Pre-trained Model Files</h5>
+                         <label for="uploaded_model_file">Model File (.pkl or .joblib)</label>
+                         <input type="file" name="uploaded_model_file" id="uploaded_model_file" accept=".pkl,.joblib">
+                         {% if prev_config.uploaded_model_filename %}
+                            <p class="current-file">Previously: {{ prev_config.uploaded_model_filename }} (leave blank to keep or re-upload to change)</p>
+                         {% endif %}
+                         <small>Select your pre-trained scikit-learn model file.</small>
+
+                         <label for="uploaded_metadata_file">Metadata File (.json)</label>
+                         <input type="file" name="uploaded_metadata_file" id="uploaded_metadata_file" accept=".json">
+                         {% if prev_config.uploaded_metadata_filename %}
+                            <p class="current-file">Previously: {{ prev_config.uploaded_metadata_filename }} (leave blank to keep or re-upload to change)</p>
+                         {% endif %}
+                         <small>Select the JSON metadata file associated with your model (containing feature info, scaler, etc.).</small>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <label class="section-label" for="target_variable">2. Select Target Variable</label>
+                    <select name="target_variable" id="target_variable" required>
+                        <option value="" disabled {% if not prev_config.get('target') %}selected{% endif %}>-- Select Target --</option>
+                        {% for col in columns %}
+                            <option value="{{ col }}" {% if prev_config.get('target') == col %}selected{% endif %}>{{ col }}</option>
+                        {% endfor %}
+                    </select>
+                    <small>This is the outcome variable in your dataset (must be binary or map to 0/1).</small>
+                </div>
+
+                <div class="form-section">
+                    <label class="section-label">3. Define Outcome Meaning</label>
+                    <div class="radio-group">
+                        {% set current_polarity = prev_config.get('outcome_polarity', 'positive') %}
+                        <label>
+                            <input type="radio" name="outcome_polarity" value="positive"
+                                   {% if current_polarity == 'positive' %}checked{% endif %}>
+                            <span>
+                                Target Value '1' Represents a <strong style="color: var(--success-color);">Positive Outcome</strong> (e.g., Loan Approved, Candidate Hired, Low Risk)
+                            </span>
+                        </label>
+                        <label>
+                            <input type="radio" name="outcome_polarity" value="negative"
+                                   {% if current_polarity == 'negative' %}checked{% endif %}>
+                            <span>
+                                Target Value '1' Represents a <strong style="color: var(--danger-color);">Negative Outcome</strong> (e.g., Loan Denied, Recidivism Predicted, High Risk)
+                            </span>
+                        </label>
+                    </div>
+                    <small>This determines how fairness metrics and results are labeled based on the target variable's '1' value.</small>
+                </div>
+
+                <div class="form-section">
+                    <label class="section-label">4. Select Protected Attributes</label>
+                    <div class="checkbox-group" id="protected-group">
+                        {% set selected_protected = prev_config.get('protected', []) %}
+                        {% for col in columns %}
+                            <label>
+                                <input type="checkbox" name="protected_attributes" value="{{ col }}"
+                                       {% if col in selected_protected %}checked{% endif %}
+                                       class="column-checkbox protected-checkbox">
+                                <span>{{ col }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                    <small>Select attributes from your dataset for fairness evaluation (cannot be target or a model feature).</small>
+                </div>
+
+                <div class="form-section">
+                    <label class="section-label">5. Select Model Features</label>
+                     <div class="checkbox-group" id="feature-group">
+                          {% set selected_features = prev_config.get('features', []) %}
+                         {% for col in columns %}
+                             <label>
+                                 <input type="checkbox" name="model_features" value="{{ col }}"
+                                        {% if col in selected_features %}checked{% endif %}
+                                        class="column-checkbox feature-checkbox">
+                                 <span>{{ col }}</span>
+                             </label>
+                         {% endfor %}
+                    </div>
+                     <small id="feature-description">
+                         Select attributes the model should use for prediction (cannot be target or protected).
+                         <br><strong>For pre-trained models:</strong> Select columns from your current dataset that correspond to the features the uploaded model was originally trained on. The model's metadata will guide how these are processed.
+                    </small>
+                </div>
+
+                <div>
+                    <button type="submit" class="submit-button" id="main-submit-button">Train Model & Analyze Fairness</button>
+                </div>
+
+                <div id="loading-overlay">
+                    <div class="spinner"></div>
+                    <div id="loading-text">Processing... Please wait.</div>
+                </div>
+
+            </form>
+
+            <div class="footer-link">
+                <p><a href="{{ url_for('dashboard') }}">Upload a different dataset</a></p>
+            </div>
+            {% else %}
+                 <p style="color: var(--danger-color); text-align: center;">Error: Configuration data (prev_config) is missing. Please try uploading again.</p>
+                 <div class="footer-link"> <p><a href="{{ url_for('dashboard') }}">Upload a dataset</a></p> </div>
+            {% endif %}
+        {% else %}
+            <p style="color: var(--danger-color); text-align: center;">Error: No columns found to configure. Please <a href="{{ url_for('dashboard') }}">upload a valid dataset</a>.</p>
+        {% endif %}
+    </div>
+
+    <script>
+        const form = document.getElementById('config-form');
+        const targetSelect = document.getElementById('target_variable');
+        const protectedCheckboxes = targetSelect ? document.querySelectorAll('.protected-checkbox') : [];
+        const featureCheckboxes = targetSelect ? document.querySelectorAll('.feature-checkbox') : [];
+        const allColumnCheckboxes = targetSelect ? document.querySelectorAll('.column-checkbox') : [];
+        const mainSubmitButton = document.getElementById('main-submit-button');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
+        const modelFileInp = document.getElementById('uploaded_model_file');
+        const metadataFileInp = document.getElementById('uploaded_metadata_file');
+
+
+        function handleSelectionChange() {
+            if (!targetSelect) return;
+            const targetValue = targetSelect.value;
+            const selectedProtected = Array.from(protectedCheckboxes).filter(cb => cb.checked).map(cb => cb.value);
+            const selectedFeatures = Array.from(featureCheckboxes).filter(cb => cb.checked).map(cb => cb.value);
+            const currentModelType = document.querySelector('input[name="model_type"]:checked')?.value;
+
+            allColumnCheckboxes.forEach(cb => {
+                const labelElement = cb.closest('label');
+                if (!labelElement) return;
+                const textSpan = labelElement.querySelector('span');
+                let isDisabled = false;
+                let title = '';
+
+                // Basic universal constraints
+                if (cb.value === targetValue && targetValue !== "") { isDisabled = true; title = 'Target variable cannot be selected here'; }
+                else if (cb.classList.contains('feature-checkbox') && selectedProtected.includes(cb.value)) { isDisabled = true; title = 'Cannot be both Feature and Protected'; }
+                else if (cb.classList.contains('protected-checkbox') && selectedFeatures.includes(cb.value)) { isDisabled = true; title = 'Cannot be both Protected and Feature'; }
+                else {
+                    if(cb.classList.contains('feature-checkbox')) title = 'Select as model feature';
+                    if(cb.classList.contains('protected-checkbox')) title = 'Select as protected attribute';
+                }
+
+                cb.disabled = isDisabled;
+                labelElement.title = title;
+                if (isDisabled) {
+                    if (cb.checked) { cb.checked = false; } // Uncheck if it becomes disabled
+                    labelElement.classList.add('disabled-label');
+                } else {
+                    labelElement.classList.remove('disabled-label');
+                }
+            });
+        }
+
+        if (targetSelect) {
+            targetSelect.addEventListener('change', handleSelectionChange);
+            allColumnCheckboxes.forEach(cb => cb.addEventListener('change', handleSelectionChange));
+            // Also trigger on model type change, as "features" meaning might shift contextually for user.
+            document.querySelectorAll('input[name="model_type"]').forEach(radio => {
+                radio.addEventListener('change', handleSelectionChange);
+            });
+        }
+
+        function showModelOptions(modelType) {
+            document.querySelectorAll('.hyperparameter-section').forEach(section => { section.style.display = 'none'; });
+            const uploadSection = document.getElementById('options-upload_model');
+            if (uploadSection) { uploadSection.style.display = 'none'; }
+
+            let selectedSectionId = '';
+            let submitButtonText = 'Train Model & Analyze Fairness';
+            let loadingMessage = 'Training Model... Please wait.';
+
+            if (modelType === 'logistic_regression' || modelType === 'svm') {
+                selectedSectionId = `params-${modelType}`;
+                 if (modelType === 'svm') loadingMessage = 'Training SVM Model... Please wait.';
+                 else loadingMessage = 'Training Logistic Regression... Please wait.';
+                 if(modelFileInp) modelFileInp.removeAttribute('required');
+                 if(metadataFileInp) metadataFileInp.removeAttribute('required');
+
+            } else if (modelType === 'upload_model') {
+                selectedSectionId = `options-${modelType}`;
+                 submitButtonText = 'Analyze Uploaded Model Fairness';
+                 loadingMessage = 'Analyzing Uploaded Model... Please wait.';
+                 // Only set required if no file was previously indicated (or if we want to force re-upload)
+                 // For simplicity, let's require them if this option is chosen and they are empty.
+                 // Server-side will handle if files are missing from request.files
+                 // This client-side 'required' is more of a UX hint.
+                 if(modelFileInp && !modelFileInp.value && !document.querySelector('#options-upload_model .current-file')) { // Check if a new file is needed
+                    modelFileInp.setAttribute('required', 'required');
+                 } else if (modelFileInp) {
+                    modelFileInp.removeAttribute('required');
+                 }
+                 if(metadataFileInp && !metadataFileInp.value && !document.querySelector('#options-upload_model .current-file')) {
+                    metadataFileInp.setAttribute('required', 'required');
+                 } else if (metadataFileInp) {
+                    metadataFileInp.removeAttribute('required');
+                 }
+            }
+
+             const selectedSection = document.getElementById(selectedSectionId);
+            if (selectedSection) {
+                selectedSection.style.display = 'block';
+            }
+
+            if(mainSubmitButton) {
+                mainSubmitButton.textContent = submitButtonText;
+                mainSubmitButton.dataset.loadingText = loadingMessage;
+            }
+        }
+
+        if (form && loadingOverlay && mainSubmitButton) {
+            form.addEventListener('submit', function(event) {
+                 const currentLoadingText = mainSubmitButton.dataset.loadingText || 'Processing... Please wait.';
+                 if(loadingText) {
+                    loadingText.textContent = currentLoadingText;
+                 }
+                loadingOverlay.style.display = 'flex';
+                mainSubmitButton.disabled = true;
+                mainSubmitButton.classList.add('loading');
+
+                // Additional check for uploaded model files if that option is active
+                const selectedModelType = document.querySelector('input[name="model_type"]:checked');
+                if (selectedModelType && selectedModelType.value === 'upload_model') {
+                    if ((!modelFileInp || !modelFileInp.files || modelFileInp.files.length === 0) && !document.querySelector('#options-upload_model .current-file')) { // Check current-file too if we allow keeping old
+                        // This logic is simplified: if 'upload_model' is chosen, app.py expects files.
+                        // If we want to allow *keeping* previously uploaded session files, this needs more complex logic.
+                        // For now, assume if "upload_model" is picked, new files must be supplied if the input is empty.
+                    }
+                     if ((!metadataFileInp || !metadataFileInp.files || metadataFileInp.files.length === 0) && !document.querySelector('#options-upload_model .current-file')) {
+                        // same as above
+                    }
+                }
+            });
+        }
+        // Make sure file inputs lose 'required' if another model type is selected after 'upload_model' was.
+        document.querySelectorAll('input[name="model_type"]').forEach(radio => {
+            radio.addEventListener('change', (event) => {
+                showModelOptions(event.target.value);
+            });
+        });
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+             if (targetSelect) {
+                handleSelectionChange(); // Initial call to set disabled states
+             }
+            const selectedModelRadio = document.querySelector('input[name="model_type"]:checked');
+            if (selectedModelRadio) {
+                showModelOptions(selectedModelRadio.value);
+            } else {
+                 // Default to logistic regression if nothing is pre-selected (e.g. fresh session state)
+                 const defaultRadio = document.querySelector('input[name="model_type"][value="logistic_regression"]');
+                 if(defaultRadio) {
+                     defaultRadio.checked = true;
+                     showModelOptions('logistic_regression');
+                 }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# Web Frameworks
+fastapi==0.95.2                # Last FastAPI supporting Python 3.9
+Flask==3.1.0
+unicorn[standard]==0.22.0      # Compatible with fastapi==0.95.2
+python-multipart==0.0.6
+python-dotenv==1.0.1
+
+# Machine Learning & Data
+numpy==1.26.4
+pandas==2.0.3
+scipy==1.10.1
+scikit-learn==1.3.2
+matplotlib==3.7.4
+keras==2.11.0
+tensorflow==2.11.0
+torch==2.0.1
+transformers==4.31.0
+
+# Utilities
+psutil==5.9.8

@@ -1,0 +1,41 @@
+<div class="benchmark-class-container" (click)="toggleCollapsed()" [ngClass]="{'active': !collapsed}">
+  <div class="benchmark-class">
+    <h2>{{ benchmarkClass.className | titlecase }}</h2>
+
+    <div class="benchmark-class__overview">
+      <div class="benchmark-class__overview__performance">
+        <span class="value">
+          {{ 'Accuracy:' }} {{ ((benchmarkClass.performance.accuracy.pruned * 100) | number: '1.1-1') }}%
+        </span>
+        <span class="change" [style.color]="changeColor">({{ formattedAccuracyChange }})</span>
+      </div>
+      <svg-icon
+        class="dropdown-icon"
+        src="assets/svgs/icon-chevron-down.svg"
+        [svgStyle]="{'height.px': 30, 'width.px': 30}">
+      </svg-icon>
+    </div>
+  </div>
+  <div class="benchmark-class__details" [ngStyle]="{'display': collapsed ? 'none' : 'flex'}">
+    <app-benchmark-class-performance
+      [metricName]="'F1 Score'"
+      [classPerformance]="benchmarkClass.performance.f1Score"
+      [maxValue]="100"
+    />
+    <app-benchmark-class-performance
+      [metricName]="'Precision'"
+      [classPerformance]="benchmarkClass.performance.precision"
+      [maxValue]="100"
+    />
+    <app-benchmark-class-performance
+      [metricName]="'Recall'"
+      [classPerformance]="benchmarkClass.performance.recall"
+      [maxValue]="100"
+    />
+    <app-benchmark-class-performance
+      [metricName]="'Accuracy'"
+      [classPerformance]="benchmarkClass.performance.accuracy"
+      [maxValue]="100"
+    />
+  </div>
+</div>

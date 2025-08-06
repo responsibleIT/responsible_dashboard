@@ -1,0 +1,1563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fairness Analysis Results</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        /* --- Base & Variables --- */
+        :root {
+            --primary-color: #007bff;
+            --primary-light: #e7f3ff;
+            --secondary-color: #6c757d;
+            --success-color: #198754; /* Green for positive change */
+            --warning-color: #ffc107;
+            --danger-color: #dc3545; /* Red for negative change */
+            --light-gray: #f8f9fa;
+            --medium-gray: #dee2e6;
+            --dark-gray: #6c757d;
+            --text-color: #343a40;
+            --card-bg: #ffffff;
+            --body-bg: #f4f7f6;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --font-family-sans-serif: 'Inter', sans-serif;
+        }
+        body { font-family: var(--font-family-sans-serif); line-height: 1.6; padding: 20px; background-color: var(--body-bg); color: var(--text-color); margin: 0; }
+        .container { max-width: 95%; margin: auto; }
+        h1, h2, h3, h4, h5, h6 { margin-bottom: 0.5rem; font-weight: 600; line-height: 1.3; color: #333;}
+        h1 { text-align: center; margin-bottom: 30px; font-weight: 700; color: #212529; }
+        h3 { font-size: 1.5rem; margin-bottom: 1rem; color: #495057; }
+        h4 { font-size: 1.25rem; margin-top: 1.5rem; margin-bottom: 0.75rem; color: #495057;}
+        h5 { font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--text-color); font-weight: 600; display: flex; align-items: center; }
+        p { margin-bottom: 1rem; }
+        a { color: var(--primary-color); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        hr { border: 0; border-top: 1px solid #eee; margin: 30px 0; }
+
+        /* --- Layout --- */
+        .main-content-area { display: flex; flex-wrap: nowrap; gap: 30px; transition: gap 0.4s ease-in-out; align-items: flex-start; }
+        .left-sidebar {
+            flex: 0 0 350px;
+            background-color: var(--card-bg);
+            border: 1px solid var(--medium-gray);
+            padding: 25px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            transition: flex-basis 0.4s ease-in-out, padding 0.4s ease-in-out, opacity 0.3s ease-in-out, transform 0.4s ease-in-out, margin-right 0.4s ease-in-out;
+            position: sticky; top: 20px; align-self: flex-start; max-height: calc(100vh - 40px); overflow-y: auto;
+        }
+        .results-area { flex: 1; min-width: 450px; transition: margin-left 0.4s ease-in-out; }
+        .sidebar-content-wrapper { position: relative; height: 100%; }
+
+        /* --- Sidebar Controls --- */
+        .left-sidebar h3 { border-bottom: none; margin-bottom: 20px; font-size: 1.3em; color: #333; }
+        .left-sidebar label { font-weight: 600; display: block; margin-bottom: 8px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+        .control-section { margin-bottom: 25px; padding-bottom: 20px; border-bottom: 1px solid #eee;}
+        .control-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0;}
+        .checkbox-group, .radio-group { max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px 12px; margin-bottom: 15px; background-color: #fff; border-radius: 4px;}
+        .checkbox-group label, .radio-group label { display: block; margin-bottom: 5px; font-weight: normal; cursor: pointer; font-size: 0.9rem; line-height: 1.4; }
+        .checkbox-group input[type="checkbox"], .radio-group input[type="radio"] { margin-right: 8px; transform: scale(1.0); vertical-align: middle; }
+        .checkbox-group input[disabled] + span { color: #999; text-decoration: line-through; cursor: not-allowed; }
+        .checkbox-group label.disabled-label { color: #999; cursor: not-allowed; }
+        .budget-attribute-block { margin-bottom: 15px; }
+        .budget-enable-label, .proxy-enable-label { font-size: 0.95em; font-weight: 600; display: flex; align-items: center; cursor: pointer; }
+        .budget-enable-label input[type="checkbox"], .proxy-enable-label input[type="checkbox"] { margin-right: 8px; }
+        .budget-groups { margin-left: 15px; margin-top: 10px; font-size: 0.9em; display: none; padding-left: 15px; border-left: 2px solid #eee; }
+        .budget-groups.active { display: block; }
+        .budget-group-item { display: flex; align-items: center; margin-bottom: 8px; flex-wrap: wrap;}
+        .budget-group-label { flex-basis: 130px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 5px; font-weight: normal;}
+        .budget-group-item input[type="number"] { width: 65px; padding: 4px 6px; font-size: 0.9em; margin-left: auto; border: 1px solid #ccc; border-radius: 4px; }
+        .budget-placeholder, .proxy-placeholder { color: var(--dark-gray); font-style: italic; font-size: 0.85em; margin-top: 5px; margin-bottom: 10px;}
+        .importance-list-container { margin-top: 8px; padding-left: 10px; font-size: 0.85em; border-left: 2px solid #eee; margin-left: 15px; margin-bottom: 10px; }
+        .importance-list-container h6 { font-size: 0.9em; margin-bottom: 3px; color: #333; font-weight: bold; }
+        .importance-list-container ol { padding-left: 18px; margin: 0; }
+        .importance-list-container li { margin-bottom: 2px; color: #555; }
+        .no-importance-info { color: #888; font-style: italic; font-size: 0.8em; }
+        .rerun-button { width: 100%; padding: 12px 15px; background: linear-gradient(to bottom, var(--primary-color), #0056b3); color: white; border: none; border-radius: var(--border-radius); cursor: pointer; font-size: 1rem; font-weight: 600; margin-top: 15px; transition: background 0.3s ease, opacity 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .rerun-button:hover { background: linear-gradient(to bottom, #0056b3, #004085); }
+        .rerun-button.loading { opacity: 0.7; cursor: not-allowed; }
+        .hyperparameter-section-sidebar { display: none; margin-top: 10px; padding: 10px; border: 1px dashed var(--medium-gray); border-radius: 4px; background-color: #fdfdfd; font-size: 0.85em; }
+        .hyperparameter-section-sidebar h5 { font-size: 0.9em; margin-top: 0; margin-bottom: 8px; color: #555; font-weight: 600; }
+        .hyperparameter-section-sidebar label { font-weight: 500; font-size: 0.85em; margin-bottom: 3px; display: block; justify-content: flex-start; align-items: initial; }
+        .hyperparameter-section-sidebar select, .hyperparameter-section-sidebar input[type="text"], .hyperparameter-section-sidebar input[type="number"] { width: 90%; padding: 4px 6px; font-size: 0.85em; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 8px; display: block; box-sizing: border-box; }
+        .hyperparameter-section-sidebar small { font-size: 0.8em; color: var(--dark-gray); display: block; margin-top: -5px; margin-bottom: 5px; }
+        /* NEW: Note for detected model in sidebar */
+        .detected-model-note-sidebar {
+            background-color: var(--primary-light); color: var(--primary-color);
+            padding: 8px 12px; border-radius: 4px; margin-bottom: 15px;
+            font-size: 0.85em; border-left: 3px solid var(--primary-color);
+        }
+
+        /* Results Area: Summary Card */
+        .summary-card { background-color: var(--card-bg); padding: 20px 25px; border-radius: var(--border-radius); box-shadow: var(--box-shadow); margin-bottom: 30px; border-left: 5px solid var(--primary-color); }
+        .summary-card h4 { margin-top: 0; margin-bottom: 15px; color: var(--primary-color); font-size: 1.3rem; }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
+        .summary-item { background-color: var(--light-gray); padding: 10px 15px; border-radius: 6px; border: 1px solid #eee;}
+        .summary-item strong { display: block; font-size: 0.8rem; color: var(--secondary-color); margin-bottom: 3px; font-weight: 600; }
+        .summary-item span { font-size: 1rem; font-weight: 600; color: var(--text-color); word-wrap: break-word; }
+        .summary-item ul { list-style: none; padding: 0; margin: 0; font-size: 0.9rem; }
+        .summary-item li { display: inline-block; margin-right: 5px; padding: 2px 6px; background-color: #e9ecef; border-radius: 4px; font-size: 0.85em; }
+        .summary-accuracy { display: flex; flex-direction: column; justify-content: center; }
+        .summary-accuracy .value-line { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
+        .summary-accuracy .value-line strong { display: inline; font-size: 1rem !important; color: var(--text-color) !important; margin-right: 0; font-weight: 600; text-transform: none; }
+        .summary-accuracy .metric-diff { font-size: 0.8em; vertical-align: baseline; margin-left: 0; }
+        .budget-active-note { color: var(--danger-color); font-weight: bold; font-size: 0.9em; margin-top: 5px; display: block; }
+        .summary-outcome-polarity { display: flex; align-items: center; gap: 8px; }
+        .summary-outcome-polarity span { font-size: 1rem; font-weight: 600; }
+        .summary-outcome-polarity .polarity-label { padding: 3px 8px; border-radius: 4px; color: white; font-size: 0.85em; font-weight: bold; }
+        .summary-outcome-polarity .polarity-positive { background-color: var(--success-color); }
+        .summary-outcome-polarity .polarity-negative { background-color: var(--danger-color); }
+
+        /* Results Area: Accordion */
+        .accordion-item { background-color: var(--card-bg); margin-bottom: 15px; border-radius: var(--border-radius); box-shadow: var(--box-shadow); border: 1px solid var(--medium-gray); }
+        .accordion-header { background-color: #e9ecef; padding: 15px 20px; cursor: pointer; font-weight: 600; font-size: 1.2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--medium-gray); transition: background-color 0.3s ease; position: relative; z-index: 10;}
+        .accordion-header:hover { background-color: #dde2e6; }
+        .accordion-content > .accordion-item > .accordion-header { background-color: #f8f9fa; font-size: 1.05rem; padding: 12px 18px; font-weight: 600; color: #495057; border-bottom: 1px solid var(--medium-gray); margin-top: 0; border-top: none; border-radius: 0; }
+        .accordion-content > .accordion-item > .accordion-header:hover { background-color: #e9ecef; }
+        .accordion-content { display: block; max-height: 0; overflow: hidden; padding-top: 0; padding-bottom: 0; padding-left: 25px; padding-right: 25px; transition: max-height 0.4s ease-out, padding-top 0.4s ease-out, padding-bottom 0.4s ease-out; box-sizing: border-box; border-top: none; }
+        .accordion-item .accordion-content .accordion-content { padding-top: 0; padding-bottom: 0; padding-left: 20px; padding-right: 20px; transition: max-height 0.3s ease-out, padding-top 0.3s ease-out, padding-bottom 0.3s ease-out; border-top: none; }
+        .accordion-item.active > .accordion-content { max-height: 15000px; padding-top: 25px; padding-bottom: 25px; transition: max-height 0.5s ease-in, padding-top 0.5s ease-in, padding-bottom 0.5s ease-in; border-top: 1px solid var(--medium-gray); }
+        .accordion-item.active > .accordion-content > .accordion-item.active > .accordion-content { max-height: 10000px; padding-top: 15px; padding-bottom: 15px; transition: max-height 0.4s ease-in, padding-top 0.4s ease-in, padding-bottom 0.4s ease-in; border-top: 1px solid var(--medium-gray); }
+        .accordion-item.active > .accordion-header::after { transform: rotate(135deg); }
+        .accordion-header::after { content: '+'; font-size: 1.4rem; font-weight: bold; color: var(--secondary-color); transition: transform 0.3s ease-in-out; }
+        .accordion-content > .accordion-item { border: none; box-shadow: none; border-top: 1px solid var(--medium-gray); margin-bottom: 0; border-radius: 0; }
+        .accordion-content > .accordion-item:first-child { border-top: none; }
+        .accordion-content > .accordion-item > .accordion-header { border-bottom: 1px solid var(--medium-gray); }
+        .accordion-item.active > .accordion-content > .accordion-item > .accordion-header { border-bottom: 1px solid var(--medium-gray); }
+        .accordion-item.active > .accordion-content > .accordion-item.active > .accordion-header { border-bottom: none; }
+
+        /* --- Results Area: Fairness Metric Cards --- */
+        .metric-card { border: 1px solid #eee; border-radius: 6px; padding: 20px; margin-bottom: 25px; background-color: #fff; }
+        .metric-card h5 { border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; font-size: 1.1rem; }
+        .overall-fairness-score { background-color: var(--primary-light); border: 1px solid var(--primary-color); border-left-width: 4px; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; text-align: center; }
+        .overall-fairness-score .score-label { display: block; font-size: 0.9em; font-weight: 600; color: var(--primary-color); margin-bottom: 3px; }
+        .overall-fairness-score .score-value { font-size: 1.4em; font-weight: bold; color: var(--text-color); }
+        .overall-fairness-score .score-components { font-size: 0.8em; color: var(--dark-gray); margin-top: 4px; }
+        .sort-controls { margin-bottom: 20px; margin-top: -10px; text-align: right; font-size: 0.9em; padding-right: 5px; }
+        .sort-controls label { font-weight: 600; margin-right: 5px; color: var(--secondary-color); }
+        .sort-controls select { padding: 3px 5px; border: 1px solid var(--medium-gray); border-radius: 4px; font-size: 0.9em; }
+        .metric-group-breakdown { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+        .metric-group-item { flex: 1; min-width: 220px; text-align: center; border: 1px solid transparent; transition: order 0.3s ease-in-out; padding-bottom: 10px; }
+        .metric-group-item .group-name { font-weight: 600; margin-bottom: 10px; font-size: 0.95rem; }
+        .metric-group-item .rate-display { margin-bottom: 8px; text-align: center; }
+        .metric-group-item .rate-label { display: block; font-weight: 600; font-size: 0.85em; color: #555; margin-bottom: 3px; }
+        .metric-group-item .rate-value-line { display: flex; justify-content: center; align-items: baseline; gap: 5px; }
+        .metric-group-item .rate-value { font-size: 1.3rem; font-weight: bold; color: var(--primary-color); }
+        .metric-group-item .rate-display.tpr-rate { margin-bottom: 10px; }
+        .metric-group-item .rate-display.fpr-rate { margin-bottom: 8px; }
+        .info-img-icon { width: 16px; height: 16px; vertical-align: middle; margin-left: 5px; cursor: help; position: relative; top: -1px; }
+        .icon-viz-container { margin-top: 10px; margin-bottom: 15px; padding: 10px; background-color: #f8f8f8; border: 1px solid #eee; border-radius: 4px; }
+        .highlight-scroll { transition: background-color 0.5s ease-out; background-color: var(--primary-light) !important; }
+        .icon-viz-container .viz-description { font-size: 0.8em; margin: 0 0 8px 0; color: #555; text-align: center;}
+        .icon-viz-container .viz-group { display: block; text-align: center; margin-bottom: 5px; }
+        .icon-viz-container .viz-group-label { display: block; font-weight: bold; margin-bottom: 3px; font-size: 0.85em; color: #444; }
+        .icon-viz-container .person-icons { display: flex; gap: 1px; justify-content: center; flex-wrap: wrap; }
+        .person-img-icon { height: 1.2em; width: auto; display: inline-block; vertical-align: middle; margin: 0 1px; }
+        .icon-group-clickable { display: inline-flex; align-items: center; cursor: pointer; padding: 2px; margin: 0 1px; border-radius: 3px; transition: background-color 0.2s ease-in-out; }
+        .icon-group-clickable:hover { background-color: #e0e0e0; }
+        .icon-group-clickable .person-img-icon { margin: 0; }
+        .metric-card .metric-group-item .icon-viz-container + .icon-viz-container { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #ddd; }
+        .metric-diff { font-size: 0.85rem; font-weight: 600; padding: 2px 5px; border-radius: 4px; color: white; white-space: nowrap; vertical-align: middle; }
+        .metric-diff.diff-positive { background-color: var(--success-color); }
+        .metric-diff.diff-negative { background-color: var(--danger-color); }
+        .metric-diff.diff-neutral { background-color: var(--secondary-color); }
+
+        /* Enhanced Table Styles */
+        .detail-table { border-collapse: separate; border-spacing: 0; width: 100%; max-width: 100%; margin: 20px auto; font-size: 0.95rem; border: 1px solid var(--medium-gray); border-radius: var(--border-radius); box-shadow: 0 1px 3px rgba(0,0,0,0.04); overflow: hidden; }
+        .accordion-content .detail-table { margin-top: 15px; margin-bottom: 10px; font-size: 0.9rem; box-shadow: none; border-radius: 6px; }
+        .detail-table th, .detail-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--medium-gray); vertical-align: middle; }
+        .detail-table th { background-color: var(--light-gray); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--secondary-color); border-top: none; border-bottom-width: 2px; }
+        .detail-table tbody tr:last-child td { border-bottom: none; }
+        .detail-table tbody tr:hover { background-color: var(--primary-light); }
+        .detail-table .metric-value { text-align: right; font-family: monospace, sans-serif; font-size: 1em; }
+        .accordion-content .detail-table th, .accordion-content .detail-table td { padding: 8px 12px; }
+        .accordion-content .detail-table th { font-size: 0.75rem; }
+        .detail-table .significant-yes { color: var(--danger-color); font-weight: bold; text-align: center; }
+        .detail-table tr.significant-row td { background-color: #fff3f3; }
+        .detail-table tr.significant-row:hover td { background-color: #ffebeb; }
+        .detail-table .subgroup-detail-item { font-size: 0.85em; line-height: 1.4; color: #555; max-width: 250px; word-wrap: break-word;}
+        .detail-table .subgroup-detail-item div { margin-bottom: 3px; }
+        .detail-table .subgroup-detail-item div:last-child { margin-bottom: 0; }
+        .detail-table .subgroup-detail-item strong { color: var(--text-color); }
+        .proxy-analysis-display { margin-top: 30px; }
+        .proxy-analysis-display h3 { margin-top: 0; margin-bottom: 10px; font-size: 1.1rem; border-bottom: 1px solid #eee; padding-bottom: 5px; display: flex; align-items: center;}
+        .no-metrics { color: var(--secondary-color); font-style: italic; padding: 15px 0; }
+        .no-outliers { color: var(--secondary-color); font-style: italic; font-size: 0.9em; padding: 10px 0; margin-left: 5px;}
+        .outlier-description { font-size: 0.9em; margin-bottom: 15px; color: #555; background-color: #f8f9fa; padding: 8px 12px; border-radius: 4px; border: 1px solid #eee; }
+
+        /* Pie Chart Styles */
+        .pie-chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 25px; margin-top: 15px; margin-bottom: 20px; }
+        .pie-chart-container { background-color: #fff; padding: 15px; border-radius: var(--border-radius); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06); border: 1px solid var(--medium-gray); text-align: center; }
+        .pie-chart-container h6 { font-size: 0.95rem; color: var(--text-color); margin-bottom: 10px; text-align: center; }
+        .pie-chart-container canvas { max-width: 100%; height: auto; max-height: 250px; cursor: pointer; } /* Added cursor pointer */
+        .attribute-accordion-content { }
+        .metric-concept-accordion-item { }
+        .pie-sub-accordion { }
+        .pie-chart-section { }
+        .pie-group-container { }
+
+        /* Collapsible Sidebar Styles */
+        #toggle-sidebar-btn { position: fixed; top: 80px; left: 15px; z-index: 100; background-color: var(--secondary-color); color: white; border: none; border-radius: 50%; width: 30px; height: 30px; font-size: 16px; line-height: 30px; text-align: center; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: background-color 0.3s ease, transform 0.3s ease, left 0.4s ease-in-out; }
+        #toggle-sidebar-btn:hover { background-color: var(--text-color); transform: scale(1.1); }
+        body.sidebar-collapsed .left-sidebar { flex-basis: 0; padding-left: 0; padding-right: 0; opacity: 0; transform: translateX(-100%); border: none; box-shadow: none; margin-right: -30px; overflow-y: hidden; }
+        body.sidebar-collapsed .main-content-area { gap: 0; }
+        body.sidebar-collapsed #toggle-sidebar-btn { left: 15px; }
+
+        /* Footer Links */
+        .footer-links { margin-top: 40px; text-align: center; font-size: 0.9em; padding-top: 20px; border-top: 1px solid #eee;}
+        .footer-links a { margin: 0 15px; color: var(--secondary-color); font-weight: 600;}
+
+        /* Loading Indicator Styles */
+        #loading-overlay-sidebar { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.9); display: none; justify-content: center; align-items: center; flex-direction: column; z-index: 1000; border-radius: var(--border-radius); text-align: center; }
+        #loading-overlay-sidebar .spinner { border: 6px solid var(--light-gray); border-top: 6px solid var(--primary-color); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        #loading-overlay-sidebar #loading-text-sidebar { font-size: 1rem; font-weight: 600; color: var(--text-color); }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- History Modal Styles --- */
+        #history-modal { z-index: 1050; } /* Ensure it appears above other elements */
+        .view-history-btn { /* Style the history button */
+            padding: 5px 12px; font-size: 0.85em; background-color: var(--secondary-color); color: white; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.2s ease; display: inline-flex; align-items: center;
+        }
+        .view-history-btn:hover { background-color: var(--dark-gray); }
+        .view-history-btn img { /* Style the icon within the button */
+             width: 14px; height: 14px; vertical-align: middle; margin-right: 5px; filter: brightness(0) invert(1); /* Make icon white */
+        }
+        #history-modal-close:hover, #history-modal-close:focus { color: black; text-decoration: none; cursor: pointer; }
+
+        /* --- Individual Details Modal Styles --- */
+        #individual-details-modal { z-index: 1060; } /* Higher z-index */
+        #individual-details-modal h4 { font-size: 1.15rem; }
+        #individual-details-modal h4 small { font-size: 0.8em; color: #555; }
+        #individual-details-table-container .detail-table {
+            font-size: 0.8rem; /* Smaller font for table in modal */
+            margin-top: 0;
+        }
+        #individual-details-table-container .detail-table th,
+        #individual-details-table-container .detail-table td {
+            padding: 6px 8px; /* Smaller padding */
+        }
+        #individual-details-modal-close:hover,
+        #individual-details-modal-close:focus { color: black; text-decoration: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+{# --- Define Labels based on Polarity --- #}
+{% set pos_outcome_label = "Positive Outcome" if outcome_polarity == 'positive' else "Negative Outcome" %} {# The outcome represented by Target=1 #}
+{% set neg_outcome_label = "Negative Outcome" if outcome_polarity == 'positive' else "Positive Outcome" %} {# The outcome represented by Target=0 #}
+
+{# Define prediction labels #}
+{% set pred_1_label = "Predicted '" ~ pos_outcome_label ~ "'" %} {# Prediction = 1 #}
+{% set pred_0_label = "Predicted '" ~ neg_outcome_label ~ "'" %} {# Prediction = 0 #}
+
+{# Define standard confusion matrix case names (independent of polarity) #}
+{% set true_positive_case = "True Positive" %} {# True=1, Pred=1 #}
+{% set false_negative_case = "False Negative" %} {# True=1, Pred=0 #}
+{% set false_positive_case = "False Positive" %} {# True=0, Pred=1 #}
+{% set true_negative_case = "True Negative" %} {# True=0, Pred=0 #}
+
+{# Define standard metric names #}
+{% set selrate_label = "Selection Rate" %}
+{% set tpr_label = "True Positive Rate (TPR)" %}
+{% set fpr_label = "False Positive Rate (FPR)" %}
+{% set precision_label = "Precision" %}
+
+<div class="container">
+    <h1>Fairness Analysis Dashboard</h1>
+
+    <button id="toggle-sidebar-btn" title="Toggle Controls Sidebar">«</button>
+
+    <div class="main-content-area">
+
+        <!-- ==== Left Sidebar (Controls) ==== -->
+        <div class="left-sidebar">
+             <div class="sidebar-content-wrapper">
+                 <form action="{{ url_for('train_and_evaluate') }}" method="post" enctype="multipart/form-data" id="controls-form"> {# Added enctype for file upload #}
+                     <h3>Analysis Controls</h3>
+                     <p style="font-size: 0.8em; color: #666; margin-top: -15px; margin-bottom: 15px;">Adjust model, features, or analysis options and re-run.</p>
+                     
+                     <!-- === Note for detected model type === -->
+                     {% if original_uploaded_model_type and original_uploaded_model_type != 'Unknown' %}
+                         {% set detected_type_normalized = original_uploaded_model_type.lower() %}
+                         {% set is_lr_detected = 'logisticregression' in detected_type_normalized or 'logistic_regression' in detected_type_normalized %}
+                         {% set is_svm_detected = 'svm' in detected_type_normalized or 'svc' in detected_type_normalized %}
+                         {% if is_lr_detected or is_svm_detected %}
+                             <div class="detected-model-note-sidebar">
+                                 Previously, a <strong>{{ original_uploaded_model_type }}</strong> model was uploaded and analyzed.
+                                 It's pre-selected below for retraining with current data/features.
+                                 Adjust parameters or select a different model type.
+                             </div>
+                         {% elif model_config.type == 'upload_model' %} {# If it was upload but not LR/SVM #}
+                             <div class="detected-model-note-sidebar">
+                                 An uploaded model of type <strong>{{ original_uploaded_model_type }}</strong> was used.
+                                 To re-train, please select a model type like Logistic Regression or SVM.
+                             </div>
+                         {% endif %}
+                     {% endif %}
+                     <!-- === END: Note for detected model type === -->
+
+                      <div class="control-section">
+                        <label>Model Type <img src="{{ url_for('static', filename='infobutton.png') }}" alt="Info" class="info-img-icon" title="Select the prediction model."></label>
+                        <div class="radio-group" id="model-type-group-sidebar">
+                            {# Determine initial checked state based on current run's config, potentially overridden by detected type #}
+                            {% set selected_model_type = model_config.get('type', 'logistic_regression') %}
+                            {% if original_uploaded_model_type and original_uploaded_model_type != 'Unknown' %}
+                                {% set detected_type_norm = original_uploaded_model_type.lower() %}
+                                {% if 'logisticregression' in detected_type_norm or 'logistic_regression' in detected_type_norm %}
+                                    {% set selected_model_type = 'logistic_regression' %}
+                                {% elif 'svm' in detected_type_norm or 'svc' in detected_type_norm %}
+                                    {% set selected_model_type = 'svm' %}
+                                {% elif selected_model_type == 'upload_model' %} {# If uploaded type unknown, default to LR for retrain #}
+                                    {% set selected_model_type = 'logistic_regression' %}
+                                {% endif %}
+                            {% elif selected_model_type == 'upload_model' %} {# If last run was upload, default to LR for retrain #}
+                                {% set selected_model_type = 'logistic_regression' %}
+                            {% endif %}
+
+                            <label><input type="radio" name="model_type" value="logistic_regression" {% if selected_model_type == 'logistic_regression' %}checked{% endif %} onclick="showSidebarHyperparameters('logistic_regression')"> Logistic Regression</label>
+                            <label><input type="radio" name="model_type" value="svm" {% if selected_model_type == 'svm' %}checked{% endif %} onclick="showSidebarHyperparameters('svm')"> SVM</label>
+                            <label><input type="radio" name="model_type" value="upload_model" {% if model_config.get('type') == 'upload_model' and selected_model_type != 'logistic_regression' and selected_model_type != 'svm' %}checked{% endif %} onclick="showSidebarHyperparameters('upload_model')"> Upload Pre-trained Model</label>
+                        </div>
+                        
+                        <div class="hyperparameter-section-sidebar" id="sidebar-params-logistic_regression">
+                            <h5>LR Parameters</h5>
+                            <label for="lr_c_sidebar">Regularization (C)</label>
+                            <input type="text" inputmode="decimal" name="lr_c" id="lr_c_sidebar" value="{{ model_config.get('params', {}).get('C', 1.0) if model_config and model_config.type == 'logistic_regression' else 1.0 }}" pattern="[0-9]*\.?[0-9]+">
+                            <small>Inverse strength (e.g., 0.1, 1.0, 10). Must be positive.</small>
+                            <label for="lr_solver_sidebar">Solver</label>
+                            <select name="lr_solver" id="lr_solver_sidebar">
+                                {% set current_lr_solver = model_config.get('params', {}).get('solver', 'lbfgs') if model_config and model_config.type == 'logistic_regression' else 'lbfgs' %}
+                                <option value="lbfgs" {% if current_lr_solver == 'lbfgs' %}selected{% endif %}>lbfgs</option>
+                                <option value="liblinear" {% if current_lr_solver == 'liblinear' %}selected{% endif %}>liblinear</option>
+                                <option value="saga" {% if current_lr_solver == 'saga' %}selected{% endif %}>saga</option>
+                            </select>
+                            <small>Optimization algorithm.</small>
+                        </div>
+                        <div class="hyperparameter-section-sidebar" id="sidebar-params-svm">
+                             <h5>SVM Parameters</h5>
+                             <label for="svm_c_sidebar">Regularization (C)</label>
+                             <input type="text" inputmode="decimal" name="svm_c" id="svm_c_sidebar" value="{{ model_config.get('params', {}).get('C', 1.0) if model_config and model_config.type == 'svm' else 1.0 }}" pattern="[0-9]*\.?[0-9]+">
+                             <small>Error term penalty (e.g., 0.1, 1.0, 10). Must be positive.</small>
+                             <label for="svm_kernel_sidebar">Kernel</label>
+                             <select name="svm_kernel" id="svm_kernel_sidebar">
+                                 {% set current_svm_kernel = model_config.get('params', {}).get('kernel', 'rbf') if model_config and model_config.type == 'svm' else 'rbf' %}
+                                 <option value="rbf" {% if current_svm_kernel == 'rbf' %}selected{% endif %}>rbf</option>
+                                 <option value="linear" {% if current_svm_kernel == 'linear' %}selected{% endif %}>linear</option>
+                                 <option value="poly" {% if current_svm_kernel == 'poly' %}selected{% endif %}>poly</option>
+                                 <option value="sigmoid" {% if current_svm_kernel == 'sigmoid' %}selected{% endif %}>sigmoid</option>
+                             </select>
+                             <small>Kernel type.</small>
+                        </div>
+                         <div class="hyperparameter-section-sidebar" id="sidebar-params-upload_model">
+                             <h5>Upload Model Files</h5>
+                             <label for="uploaded_model_file_sidebar">Model File (.pkl, .joblib):</label>
+                             <input type="file" name="uploaded_model_file" id="uploaded_model_file_sidebar" accept=".pkl,.joblib" style="margin-bottom: 5px; width: 100%;">
+                             <label for="uploaded_metadata_file_sidebar">Metadata File (.json):</label>
+                             <input type="file" name="uploaded_metadata_file" id="uploaded_metadata_file_sidebar" accept=".json" style="width: 100%;">
+                             <small style="margin-top: 5px;">If re-uploading, select new files. Otherwise, previously uploaded files (if any from last configure/run) will be used if still on server.</small>
+                        </div>
+                     </div>
+                     <div class="control-section">
+                         <label for="feature_select">Model Features <img src="{{ url_for('static', filename='infobutton.png') }}" alt="Info" class="info-img-icon" title="Select the columns the prediction model should use as input. Cannot be the target variable or protected attributes."></label>
+                         <div class="checkbox-group" id="feature_select">
+                             {% if all_columns %}
+                                 {% for col in all_columns %}
+                                     {% set is_checked = col in current_feature_cols %}
+                                     {% set is_disabled = col == target_col or col in protected_cols %}
+                                     <label class="feature-label {{ 'disabled-label' if is_disabled else '' }}" title="{{ 'Target variable (cannot be feature)' if col == target_col else ('Protected attribute (cannot be feature)' if col in protected_cols else 'Select as model feature') }}">
+                                         <input type="checkbox" name="model_features" value="{{ col }}" {% if is_checked %}checked{% endif %} {% if is_disabled %}disabled{% endif %} class="feature-checkbox-sidebar">
+                                         <span>{{ col }}</span>
+                                         {% if col == target_col %} <small style="color: var(--danger-color); display: inline; margin-left: 5px;">(Target)</small> {% endif %}
+                                         {% if col in protected_cols %} <small style="color: var(--secondary-color); display: inline; margin-left: 5px;">(Protected)</small> {% endif %}
+                                     </label>
+                                 {% endfor %}
+                             {% else %}
+                                 <p style="color: var(--danger-color);">Error: Column list not available.</p>
+                             {% endif %}
+                         </div>
+                     </div>
+                    <div class="control-section">
+                        <label>Outcome Meaning (Target=1) <img src="{{ url_for('static', filename='infobutton.png') }}" alt="Info" class="info-img-icon" title="Define if the target value '1' represents a desirable (positive) or undesirable (negative) outcome. Affects result labeling."></label>
+                        <div class="radio-group" style="max-height: none; border: none; padding: 0; margin-bottom: 5px;">
+                             <label>
+                                <input type="radio" name="outcome_polarity" value="positive" {% if outcome_polarity == 'positive' %}checked{% endif %}>
+                                <strong style="color: var(--success-color);">Positive Outcome</strong> (e.g., Approved)
+                             </label>
+                             <label>
+                                <input type="radio" name="outcome_polarity" value="negative" {% if outcome_polarity == 'negative' %}checked{% endif %}>
+                                <strong style="color: var(--danger-color);">Negative Outcome</strong> (e.g., High Risk)
+                             </label>
+                        </div>
+                    </div>
+                     <div class="control-section" id="budgeting-control-section"> {# Added ID for easier JS targeting #}
+                         <label>Feature Budgeting <img src="{{ url_for('static', filename='infobutton.png') }}" alt="Info" class="info-img-icon" title="Optionally limit the number of features used for specific subgroups based on Permutation Importance (PI). Budgeting allows creating simpler, potentially fairer models for certain groups. Only applicable when training a new model (not for uploaded models)."></label>
+                         <p class="budget-placeholder">Limit features per group based on importance.</p>
+                         {% if protected_cols %}
+                             {% for attribute in protected_cols %}
+                                 {% set budget_settings_for_attr = budget_applied_info.get('settings', {}).get(attribute, {}) if budget_applied_info else {} %}
+                                 {% set budget_enabled_for_attr = attribute in budget_applied_info.get('settings', {}) if budget_applied_info else False %}
+                                 <div class="budget-attribute-block">
+                                      <label class="budget-enable-label"><input type="checkbox" name="budget_enable_{{ attribute }}" id="budget_enable_{{ attribute }}" value="yes" onchange="toggleBudgetGroups('{{ attribute }}')" {% if budget_enabled_for_attr %}checked{% endif %}> Budget for '{{ attribute.replace('_',' ').title() }}'</label>
+                                      <div class="budget-groups {% if budget_enabled_for_attr %}active{% endif %}" id="budget_groups_{{ attribute }}">
+                                         {# === Get groups from current run AND previous run for display === #}
+                                         {% set current_attr_data_groups = current_fairness_results.get(attribute, {}).get('groups', {}) %}
+                                         {% set prev_attr_data_groups = actual_prev_fairness_results.get(attribute, {}).get('groups', {}) %} {# Use ACTUAL previous results #}
+                                         {# Combine keys and sort #}
+                                         {% set groups_to_display = (current_attr_data_groups.keys() | list + prev_attr_data_groups.keys() | list) | unique | sort %}
+
+                                         {% if groups_to_display %}
+                                             {% for group_name in groups_to_display %}
+                                                 {% set current_budget = budget_settings_for_attr.get(group_name) %}
+                                                 <div class="budget-group-item">
+                                                      <span class="budget-group-label" title="{{ group_name }}">{{ group_name }}:</span>
+                                                      <input type="number" name="budget__{{ attribute }}__{{ group_name }}" min="0" placeholder="All" title="Max features for {{ group_name }} (0 allowed). Blank=no limit." {% if current_budget is number and current_budget >= 0 %}value="{{ current_budget }}"{% endif %}>
+                                                 </div>
+                                                 <div class="importance-list-container">
+                                                     {% set importance_list = group_importances_display.get(attribute, {}).get(group_name, []) %}
+                                                     {% if importance_list %}
+                                                         <h6>Top Features (PI):</h6>
+                                                         <ol>{% set count = namespace(value=0) %}
+                                                              {% for feature, score in importance_list %}
+                                                                  {% if feature != target_col and feature not in protected_cols and count.value < 5 %}
+                                                                      <li>{{ feature }} <span style="font-size:0.8em; color:#777;">({{ "%.4f"|format(score) }})</span></li>
+                                                                      {% set count.value = count.value + 1 %}
+                                                                  {% endif %}
+                                                              {% endfor %}
+                                                              {% if count.value == 0 %}<li>(No relevant features found based on PI)</li>{% endif %}
+                                                          </ol>
+                                                     {% elif budget_enabled_for_attr %}
+                                                          <span class="no-importance-info">(Importance scores not available)</span>
+                                                     {% endif %}
+                                                 </div>
+                                             {% endfor %}
+                                         {% else %}
+                                             <p style="font-size:0.85em; color:#6c757d;">No groups found for '{{ attribute }}'.</p>
+                                         {% endif %}
+                                      </div>
+                                 </div>
+                             {% endfor %}
+                         {% else %}
+                             <p style="font-size:0.85em; color:#6c757d;">No protected attributes selected.</p>
+                         {% endif %}
+                     </div>
+                     <div class="control-section">
+                         <label>Proxy Analysis <img src="{{ url_for('static', filename='infobutton.png') }}" alt="Info" class="info-img-icon" title="Checks if features are statistically correlated with protected attributes (potential proxies). Uses ANOVA (numeric) & Cramer's V (categorical)."></label>
+                          <label class="proxy-enable-label"><input type="checkbox" name="enable_proxy_check" id="enable_proxy_check" value="yes" {% if proxy_analysis_results is defined and proxy_analysis_results %}checked{% endif %}> Analyze Feature/Protected Attribute Correlations</label>
+                          <p class="proxy-placeholder">Optional: Check for potential proxies.</p>
+                     </div>
+                     <input type="hidden" name="target_variable" value="{{ target_col }}">
+                     {% for p_col in protected_cols %}<input type="hidden" name="protected_attributes" value="{{ p_col }}">{% endfor %}
+                     <button type="submit" class="rerun-button" id="rerun-button">Update & Re-run Analysis</button>
+                 </form>
+                 <div id="loading-overlay-sidebar">
+                     <div class="spinner"></div>
+                     <div id="loading-text-sidebar">Re-running Analysis...</div>
+                 </div>
+             </div> <!-- End sidebar-content-wrapper -->
+        </div> <!-- End left-sidebar -->
+
+        <!-- ==== Right Results Area ==== -->
+        <div class="results-area">
+            <!-- === Top Summary Card === -->
+            <div class="summary-card">
+                 <h4>Run Summary</h4>
+                 <div class="summary-grid">
+                     <div class="summary-item summary-accuracy">
+                         <strong>Accuracy</strong>
+                         <div class="value-line">
+                             <strong>
+                                 {% if current_accuracy is number and current_accuracy == current_accuracy %}{{ "%.2f"|format(current_accuracy * 100) }}%{% else %}N/A{% endif %}
+                             </strong>
+                             {# ===>>> USE actual_prev_accuracy for comparison <<<=== #}
+                             {% if actual_prev_accuracy is number and actual_prev_accuracy == actual_prev_accuracy and current_accuracy is number and current_accuracy == current_accuracy %}
+                                 {% set acc_diff = current_accuracy - actual_prev_accuracy %}
+                                 {% set acc_diff_class = 'diff-positive' if acc_diff > 0.0001 else ('diff-negative' if acc_diff < -0.0001 else 'diff-neutral') %}
+                                 {% set acc_diff_sign = '+' if acc_diff > 0.0001 else '' %}
+                                 <span class="metric-diff {{ acc_diff_class }}">({{ acc_diff_sign }}{{ "%.2f"|format(acc_diff * 100) }}%)</span>
+                             {% endif %}
+                             {# ===>>> END USE actual_prev_accuracy <<<=== #}
+                         </div>
+                     </div>
+                     <div class="summary-item"><strong>Target Variable</strong><span>{{ target_col }}</span></div>
+                     <div class="summary-item summary-outcome-polarity">
+                        <strong>Outcome (Target=1)</strong>
+                        {% if outcome_polarity == 'positive' %}
+                            <span class="polarity-label polarity-positive">Positive</span>
+                        {% else %}
+                            <span class="polarity-label polarity-negative">Negative</span>
+                        {% endif %}
+                     </div>
+                      <div class="summary-item">
+                         <strong>Model Used</strong>
+                         <span>
+                            {% if model_config and model_config.get('type') == 'upload_model' and original_uploaded_model_type and original_uploaded_model_type != 'Unknown' %}
+                                Uploaded: {{ original_uploaded_model_type }}
+                            {% elif model_config and model_config.get('type') == 'upload_model' %}
+                                Uploaded Model (Type N/A from metadata)
+                            {% elif model_config and model_config.get('type') == 'logistic_regression' %}
+                                Logistic Regression
+                                {% if model_config.get('params') %}
+                                    <small style="display: block; font-size: 0.8em; color: #555;">
+                                        (C={{ model_config.get('params', {}).get('C', '?') }}, Solver={{ model_config.get('params', {}).get('solver', '?') }})
+                                    </small>
+                                {% endif %}
+                            {% elif model_config and model_config.get('type') == 'svm' %}
+                                SVM
+                                {% if model_config.get('params') %}
+                                    <small style="display: block; font-size: 0.8em; color: #555;">
+                                        (C={{ model_config.get('params', {}).get('C', '?') }}, Kernel={{ model_config.get('params', {}).get('kernel', '?') }})
+                                    </small>
+                                {% endif %}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                         </span>
+                     </div>
+                     <div class="summary-item"><strong>Protected Attributes</strong><ul>{% for item in protected_cols %}<li>{{ item }}</li>{% else %}<li>N/A</li>{% endfor %}</ul></div>
+                     <div class="summary-item"><strong>Model Features</strong><span>{{ current_feature_cols | length }} selected</span></div>
+                     <div class="summary-item"><strong>Test Set Size</strong><span>{{ test_set_size }}</span></div>
+                     <div class="summary-item">
+                         <strong>Budgeting Status</strong>
+                         <span>{{ "Applied" if budget_applied_info and budget_applied_info.get('active') else "Not Applied" }}</span>
+                         {% if budget_applied_info and budget_applied_info.get('active') %}<small class="budget-active-note">Group-specific models were trained.</small>{% endif %}
+                     </div>
+                 </div>
+            </div>
+
+            <!-- === Fairness Results Accordion === -->
+            <h3>Fairness Analysis by Protected Attribute</h3>
+             {% if current_fairness_results %}
+                {% for attribute, attr_data in current_fairness_results.items() %} {# Loop through attributes #}
+                    {% set current_groups = attr_data.get('groups', {}) %}
+                    {% set overall_scores = attr_data.get('overall_scores', {}) %}
+                    {# ===>>> Get ACTUAL previous group data for this attribute <<<=== #}
+                    {% set actual_prev_groups = actual_prev_fairness_results.get(attribute, {}).get('groups', {}) %}
+                    {# ===>>> END Get ACTUAL previous group data <<<=== #}
+
+                    <div class="accordion-item">
+                        <div class="accordion-header">{{ attribute.replace('_',' ').title() }}</div>
+                        <div class="accordion-content attribute-accordion-content" data-attribute="{{ attribute }}">
+
+                            {# --- Sort Controls & History Button --- #}
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <button class="view-history-btn" data-attribute="{{ attribute }}">
+                                    {# Ensure you have a history_icon.png in static folder or remove img tag #}
+                                    <img src="{{ url_for('static', filename='history_icon.png') }}" alt="History" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 5px;">
+                                    View Run History
+                                </button>
+                                <div class="sort-controls" style="margin-bottom: 0; margin-top: 0; text-align: right;">
+                                    <label for="sort-all-{{ attribute }}">Sort groups by:</label>
+                                    <select id="sort-all-{{ attribute }}" class="metric-sort-select-overall" data-attribute="{{ attribute }}">
+                                        <option value="default">Default</option>
+                                        <option value="high-low">Primary Score (High-Low)</option>
+                                        <option value="low-high">Primary Score (Low-High)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            {# --- End Sort Controls & History Button --- #}
+
+                            {% if current_groups %}
+                                <!-- Group Metric Cards (DP, EqOdds, PP) -->
+
+                                {# --- Demographic Parity Card --- #}
+                                <div class="metric-card" data-metric="dp">
+                                    <h5>Demographic Parity
+                                        <img src="{{ url_for('static', filename='infobutton.png') }}" alt="Info" class="info-img-icon"
+                                             title="Demographic Parity ({{ selrate_label }}): Requires similar rates of predictions for the '{{ pos_outcome_label }}' (i.e., Prediction=1) across groups, regardless of the true outcome. Goal: Similar rates.">
+                                    </h5>
+                                    <div class="overall-fairness-score">
+                                        <span class="score-label">Overall Max Difference ({{ selrate_label }})</span>
+                                        {% set dp_diff = overall_scores.get('dp_max_diff') %}
+                                        <span class="score-value">{% if dp_diff is number and dp_diff == dp_diff %}{{ "%.3f"|format(dp_diff) }}{% else %}N/A{% endif %}</span>
+                                    </div>
+                                    <div class="metric-group-breakdown" id="groups-dp-{{ attribute }}">
+                                        {% for group_name, current_metrics in current_groups.items() %}
+                                        <div class="metric-group-item" data-group-name="{{ group_name }}" data-score="{{ current_metrics.get('Demographic Parity', -999) }}">
+                                            <span class="group-name">{{ group_name }}</span>
+                                            <div class="rate-display">
+                                                <span class="rate-label">{{ selrate_label }}:</span>
+                                                <div class="rate-value-line">
+                                                    {% set current_dp = current_metrics.get('Demographic Parity') %}
+                                                    <span class="rate-value">{% if current_dp is number and current_dp == current_dp %}{{"%.3f"|format(current_dp)}}{% else %}N/A{% endif %}</span>
+                                                    {# ===>>> Compare with actual_prev_groups <<<=== #}
+                                                    {% set prev_value = actual_prev_groups.get(group_name, {}).get('Demographic Parity') %}
+                                                    {% if prev_value is number and prev_value == prev_value and current_dp is number and current_dp == current_dp %}
+                                                        {% set diff = current_dp - prev_value %}{% set diff_class = 'diff-positive' if diff > 0.0001 else ('diff-negative' if diff < -0.0001 else 'diff-neutral') %}{% set diff_sign = '+' if diff > 0.0001 else '' %}
+                                                        <span class="metric-diff {{ diff_class }}">({{ diff_sign }}{{ "%.3f"|format(diff) }})</span>
+                                                    {% endif %}
+                                                    {# ===>>> END Compare <<<=== #}
+                                                </div>
+                                            </div>
+                                            <div class="icon-viz-container" data-metric-viz="dp">
+                                                 <p class="viz-description">{{ pred_1_label }} vs. {{ pred_0_label }} (out of 10 people):</p>
+                                                {% if current_dp is number and current_dp == current_dp %}
+                                                    {% set num_colored = (current_dp * 10) | round | int %}
+                                                    <div class="person-icons">
+                                                        <span class="icon-group-clickable" data-icon-type="colored" title="Click to see distributions for '{{ pred_1_label }}' cases for {{ group_name }}">
+                                                            <img class="person-img-icon" src="{{ url_for('static', filename='person_colored.png') }}" alt="{{ pred_1_label }}">
+                                                            {% for i in range(num_colored - 1) %}<img class="person-img-icon" src="{{ url_for('static', filename='person_colored.png') }}" alt="">{% endfor %}
+                                                        </span>
+                                                        <span class="icon-group-clickable" data-icon-type="uncolored" title="Click to see distributions for '{{ pred_0_label }}' cases for {{ group_name }}">
+                                                             <img class="person-img-icon" src="{{ url_for('static', filename='person_uncolored.png') }}" alt="{{ pred_0_label }}">
+                                                            {% for i in range(10 - num_colored -1) %}<img class="person-img-icon" src="{{ url_for('static', filename='person_uncolored.png') }}" alt="">{% endfor %}
+                                                        </span>
+                                                    </div>
+                                                {% else %}<span style="font-size:0.8em; color:#888;">(N/A)</span>{% endif %}
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+
+                                {# --- Equalized Odds Card --- #}
+                                <div class="metric-card" data-metric="eo">
+                                     <h5>Equalized Odds
+                                        <img src="{{ url_for('static', filename='infobutton.png') }}" alt="Info" class="info-img-icon"
+                                             title="Equalized Odds: Requires similar rates across groups for BOTH: - True Positive Rate (TPR): Of those who should get the '{{ pos_outcome_label }}' (True=1), the fraction correctly predicted as such (Pred=1). Higher is generally better. - False Positive Rate (FPR): Of those who should get the '{{ neg_outcome_label }}' (True=0), the fraction incorrectly predicted to get the '{{ pos_outcome_label }}' (Pred=1). Lower is generally better.">
+                                     </h5>
+                                    <div class="overall-fairness-score">
+                                         <span class="score-label">Equalized Odds Overall Score (Max Rate Gap)</span>
+                                         {% set eo_score = overall_scores.get('eo_overall_score') %}
+                                         <span class="score-value">{% if eo_score is number and eo_score == eo_score %}{{ "%.3f"|format(eo_score) }}{% else %}N/A{% endif %}</span>
+                                         <div class="score-components">
+                                             {% set tpr_diff = overall_scores.get('tpr_max_diff') %}
+                                             {% set fpr_diff = overall_scores.get('fpr_max_diff') %}
+                                             (Max TPR Diff: {% if tpr_diff is number and tpr_diff == tpr_diff %}{{ "%.3f"|format(tpr_diff) }}{% else %}N/A{% endif %} | Max FPR Diff: {% if fpr_diff is number and fpr_diff == fpr_diff %}{{ "%.3f"|format(fpr_diff) }}{% else %}N/A{% endif %})
+                                         </div>
+                                    </div>
+                                    <div class="metric-group-breakdown" id="groups-eo-{{ attribute }}">
+                                        {% for group_name, current_metrics in current_groups.items() %}
+                                        <div class="metric-group-item" data-group-name="{{ group_name }}" data-score="{{ current_metrics.get('Equalized Odds', -999) }}">
+                                            <span class="group-name">{{ group_name }}</span>
+                                            <div class="rate-display tpr-rate">
+                                                {% if outcome_polarity == 'positive' %}
+                                                    <span class="rate-label">{{ tpr_label }}:</span>
+                                                {% else %}
+                                                     <span class="rate-label" title="Of those who truly had the '{{ pos_outcome_label }}', the fraction predicted as such.">{{ tpr_label }}:</span>
+                                                {% endif %}
+                                                 <div class="rate-value-line">
+                                                    {% set current_tpr = current_metrics.get('Equalized Odds') %}
+                                                    <span class="rate-value">
+                                                        {% if current_tpr is number and current_tpr == current_tpr %}{{"%.3f"|format(current_tpr)}}{% else %}N/A{% endif %}
+                                                    </span>
+                                                    {# ===>>> Compare with actual_prev_groups <<<=== #}
+                                                    {% set prev_tpr = actual_prev_groups.get(group_name, {}).get('Equalized Odds') %}
+                                                    {% if prev_tpr is number and prev_tpr == prev_tpr and current_tpr is number and current_tpr == current_tpr %}
+                                                        {% set diff_tpr = current_tpr - prev_tpr %}
+                                                        {% set diff_tpr_class = 'diff-positive' if diff_tpr > 0.0001 else ('diff-negative' if diff_tpr < -0.0001 else 'diff-neutral') %}
+                                                        {% set diff_tpr_sign = '+' if diff_tpr > 0.0001 else '' %}
+                                                        <span class="metric-diff {{ diff_tpr_class }}">({{ diff_tpr_sign }}{{ "%.3f"|format(diff_tpr) }})</span>
+                                                    {% endif %}
+                                                    {# ===>>> END Compare <<<=== #}
+                                                </div>
+                                            </div>
+                                            <div class="rate-display fpr-rate">
+                                                {% if outcome_polarity == 'positive' %}
+                                                    <span class="rate-label">{{ fpr_label }}:</span>
+                                                {% else %}
+                                                    <span class="rate-label" title="Of those who truly had the '{{ neg_outcome_label }}', the fraction predicted as '{{ pos_outcome_label }}'.">{{ fpr_label }}:</span>
+                                                {% endif %}
+                                                  <div class="rate-value-line">
+                                                    {% set current_fpr = current_metrics.get('FPR') %}
+                                                    <span class="rate-value">
+                                                        {% if current_fpr is number and current_fpr == current_fpr %}{{"%.3f"|format(current_fpr)}}{% else %}N/A{% endif %}
+                                                    </span>
+                                                    {# ===>>> Compare with actual_prev_groups <<<=== #}
+                                                    {% set prev_fpr = actual_prev_groups.get(group_name, {}).get('FPR') %}
+                                                    {% if prev_fpr is number and prev_fpr == prev_fpr and current_fpr is number and current_fpr == current_fpr %}
+                                                        {% set diff_fpr = current_fpr - prev_fpr %}
+                                                        {% set diff_fpr_class = 'diff-negative' if diff_fpr > 0.0001 else ('diff-positive' if diff_fpr < -0.0001 else 'diff-neutral') %}
+                                                        {% set diff_fpr_sign = '+' if diff_fpr > 0.0001 else '' %}
+                                                        <span class="metric-diff {{ diff_fpr_class }}">({{ diff_fpr_sign }}{{ "%.3f"|format(diff_fpr) }})</span>
+                                                    {% endif %}
+                                                    {# ===>>> END Compare <<<=== #}
+                                                </div>
+                                             </div>
+                                            {# --- EO Icon Viz 1 (TP vs FN) --- #}
+                                            <div class="icon-viz-container" data-metric-viz="eo-tpr">
+                                                <p class="viz-description">{{ true_positive_case }} vs. {{ false_negative_case }} (out of 10 true '{{ pos_outcome_label }}' cases):</p>
+                                                {% if current_tpr is number and current_tpr == current_tpr %}
+                                                    {% set num_colored_tpr = (current_tpr * 10) | round | int %}
+                                                    <div class="person-icons">
+                                                        <span class="icon-group-clickable" data-icon-type="colored" title="Click to see distributions for '{{ true_positive_case }}' cases for {{ group_name }}">
+                                                            <img class="person-img-icon" src="{{ url_for('static', filename='person_colored.png') }}" alt="{{ true_positive_case }}">
+                                                             {% for i in range(num_colored_tpr -1) %}<img class="person-img-icon" src="{{ url_for('static', filename='person_colored.png') }}" alt="">{% endfor %}
+                                                        </span>
+                                                        <span class="icon-group-clickable" data-icon-type="uncolored" title="Click to see distributions for '{{ false_negative_case }}' cases for {{ group_name }}">
+                                                            <img class="person-img-icon" src="{{ url_for('static', filename='person_uncolored.png') }}" alt="{{ false_negative_case }}">
+                                                            {% for i in range(10 - num_colored_tpr -1) %}<img class="person-img-icon" src="{{ url_for('static', filename='person_uncolored.png') }}" alt="">{% endfor %}
+                                                        </span>
+                                                    </div>
+                                                {% else %}<span style="font-size:0.8em; color:#888;">(N/A)</span>{% endif %}
+                                            </div>
+                                            {# --- EO Icon Viz 2 (FP vs TN) --- #}
+                                            <div class="icon-viz-container" data-metric-viz="eo-fpr">
+                                                 <p class="viz-description">{{ false_positive_case }} vs. {{ true_negative_case }} (out of 10 true '{{ neg_outcome_label }}' cases):</p>
+                                                {% if current_fpr is number and current_fpr == current_fpr %}
+                                                    {% set num_colored_fpr = (current_fpr * 10) | round | int %}
+                                                    <div class="person-icons">
+                                                        <span class="icon-group-clickable" data-icon-type="colored" title="Click to see distributions for '{{ false_positive_case }}' cases for {{ group_name }}">
+                                                            <img class="person-img-icon" src="{{ url_for('static', filename='person_red.png') }}" alt="{{ false_positive_case }}">
+                                                            {% for i in range(num_colored_fpr -1) %}<img class="person-img-icon" src="{{ url_for('static', filename='person_red.png') }}" alt="">{% endfor %}
+                                                        </span>
+                                                        <span class="icon-group-clickable" data-icon-type="uncolored" title="Click to see distributions for '{{ true_negative_case }}' cases for {{ group_name }}">
+                                                            <img class="person-img-icon" src="{{ url_for('static', filename='person_uncolored.png') }}" alt="{{ true_negative_case }}">
+                                                             {% for i in range(10 - num_colored_fpr-1) %}<img class="person-img-icon" src="{{ url_for('static', filename='person_uncolored.png') }}" alt="">{% endfor %}
+                                                        </span>
+                                                    </div>
+                                                {% else %}<span style="font-size:0.8em; color:#888;">(N/A)</span>{% endif %}
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+
+                                {# --- Predictive Parity Card --- #}
+                                <div class="metric-card" data-metric="pp">
+                                     <h5>Predictive Parity
+                                         <img src="{{ url_for('static', filename='infobutton.png') }}" alt="Info" class="info-img-icon"
+                                              title="Predictive Parity ({{ precision_label }}): Requires similar Precision rates across groups. Precision: Of those PREDICTED to have the '{{ pos_outcome_label }}' (Pred=1), the fraction that actually DO (True=1). Higher is generally better.">
+                                     </h5>
+                                    <div class="overall-fairness-score">
+                                        <span class="score-label">Overall Max Difference ({{ precision_label }})</span>
+                                        {% set pp_diff = overall_scores.get('pp_max_diff') %}
+                                        <span class="score-value">{% if pp_diff is number and pp_diff == pp_diff %}{{ "%.3f"|format(pp_diff) }}{% else %}N/A{% endif %}</span>
+                                    </div>
+                                    <div class="metric-group-breakdown" id="groups-pp-{{ attribute }}">
+                                        {% for group_name, current_metrics in current_groups.items() %}
+                                        <div class="metric-group-item" data-group-name="{{ group_name }}" data-score="{{ current_metrics.get('Predictive Parity', -999) }}">
+                                            <span class="group-name">{{ group_name }}</span>
+                                            <div class="rate-display precision-rate">
+                                                {% if outcome_polarity == 'positive' %}
+                                                    <span class="rate-label">{{ precision_label }}:</span>
+                                                {% else %}
+                                                     <span class="rate-label" title="Of those predicted as '{{ pos_outcome_label }}', the fraction who truly had the '{{ pos_outcome_label }}'.">{{ precision_label }}:</span>
+                                                {% endif %}
+                                                <div class="rate-value-line">
+                                                    {% set current_pp = current_metrics.get('Predictive Parity') %}
+                                                    <span class="rate-value">
+                                                        {% if current_pp is number and current_pp == current_pp %}{{"%.3f"|format(current_pp)}}{% else %}N/A{% endif %}
+                                                    </span>
+                                                    {# ===>>> Compare with actual_prev_groups <<<=== #}
+                                                    {% set prev_value = actual_prev_groups.get(group_name, {}).get('Predictive Parity') %}
+                                                    {% if prev_value is number and prev_value == prev_value and current_pp is number and current_pp == current_pp %}
+                                                        {% set diff = current_pp - prev_value %}
+                                                        {% set diff_class = 'diff-positive' if diff > 0.0001 else ('diff-negative' if diff < -0.0001 else 'diff-neutral') %}
+                                                        {% set diff_sign = '+' if diff > 0.0001 else '' %}
+                                                        <span class="metric-diff {{ diff_class }}">({{ diff_sign }}{{ "%.3f"|format(diff) }})</span>
+                                                    {% endif %}
+                                                    {# ===>>> END Compare <<<=== #}
+                                                </div>
+                                            </div>
+                                             <div class="icon-viz-container" data-metric-viz="pp">
+                                                 <p class="viz-description">{{ true_positive_case }} vs. {{ false_positive_case }} (out of 10 {{ pred_1_label }} cases):</p>
+                                                {% if current_pp is number and current_pp == current_pp %}
+                                                    {% set num_colored_pp = (current_pp * 10) | round | int %}
+                                                    <div class="person-icons">
+                                                        <span class="icon-group-clickable" data-icon-type="colored" title="Click to see distributions for '{{ true_positive_case }}' cases among {{ pred_1_label }}s for {{ group_name }}">
+                                                            <img class="person-img-icon" src="{{ url_for('static', filename='person_colored.png') }}" alt="{{ true_positive_case }}">
+                                                             {% for i in range(num_colored_pp -1) %}<img class="person-img-icon" src="{{ url_for('static', filename='person_colored.png') }}" alt="">{% endfor %}
+                                                        </span>
+                                                         <span class="icon-group-clickable" data-icon-type="uncolored" title="Click to see distributions for '{{ false_positive_case }}' cases among {{ pred_1_label }}s for {{ group_name }}">
+                                                            <img class="person-img-icon" src="{{ url_for('static', filename='person_uncolored.png') }}" alt="{{ false_positive_case }}">
+                                                             {% for i in range(10 - num_colored_pp-1) %}<img class="person-img-icon" src="{{ url_for('static', filename='person_uncolored.png') }}" alt="">{% endfor %}
+                                                        </span>
+                                                    </div>
+                                                {% else %}<span style="font-size:0.8em; color:#888;">(N/A)</span>{% endif %}
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <!-- End Group Metric Cards -->
+
+                                <!-- Detailed Group Metrics Table -->
+                                <h4>Detailed Group Metrics</h4>
+                                <table class="detail-table">
+                                   <thead><tr><th>Group</th>
+                                   <th>{{ selrate_label }}</th><th>{{ tpr_label }}</th><th>{{ fpr_label }}</th><th>{{ precision_label }}</th><th>Group Size</th>
+                                   </tr></thead>
+                                   <tbody>
+                                        {% for group_name, metrics in current_groups.items() %}
+                                       <tr><td>{{ group_name }}</td>
+                                           {% set dp_val = metrics.get('Demographic Parity') %}
+                                           {% set tpr_val = metrics.get('Equalized Odds') %}
+                                           {% set fpr_val = metrics.get('FPR') %}
+                                           {% set precision_val = metrics.get('Predictive Parity') %}
+                                           {% set size_val = metrics.get('Group Size') %}
+                                           <td class="metric-value">{% if dp_val is number and dp_val == dp_val %}{{"%.3f"|format(dp_val)}}{% else %}N/A{% endif %}</td>
+                                           <td class="metric-value">{% if tpr_val is number and tpr_val == tpr_val %}{{"%.3f"|format(tpr_val)}}{% else %}N/A{% endif %}</td>
+                                           <td class="metric-value fpr-value">{% if fpr_val is number and fpr_val == fpr_val %}{{"%.3f"|format(fpr_val)}}{% else %}N/A{% endif %}</td>
+                                           <td class="metric-value">{% if precision_val is number and precision_val == precision_val %}{{"%.3f"|format(precision_val)}}{% else %}N/A{% endif %}</td>
+                                           <td class="metric-value">{% if size_val is number %}{{ size_val }}{% else %}N/A{% endif %}</td>
+                                       </tr>
+                                       {% endfor %}
+                                   </tbody>
+                                </table>
+                                <!-- End Detailed Group Metrics Table -->
+
+                                <!-- Pie Chart Section (Simplified Descriptions) -->
+                                <hr style="margin: 30px 0 20px 0;">
+                                <h4>Cross-Attribute Distribution Analysis
+                                    <img src="{{ url_for('static', filename='infobutton.png') }}" alt="Info" class="info-img-icon"
+                                        title="Click on a pie segment to view details of individuals in that segment. These charts show how individuals within specific fairness metric categories (e.g., True Positives, False Negatives) are distributed across OTHER protected attributes.">
+                                </h4>
+                                {% if pie_chart_data is defined and pie_chart_data and protected_cols|length >= 2 %}
+                                    {% for metric_name_concept in metrics_for_outliers %} {# DP, EO, PP #}
+                                        {# --- Define Pie Labels/Descriptions Conditionally --- #}
+                                        {% set pie_non_outlier_case_desc = '' %}
+                                        {% set pie_outlier_case_desc = '' %}
+                                        {% set pie_info_icon_title = '' %}
+                                        {% set pie_non_outlier_header = '' %}
+                                        {% set pie_outlier_header = '' %}
+
+                                        {% if metric_name_concept == 'Demographic Parity' %}
+                                            {% set pie_non_outlier_header = pred_1_label %}
+                                            {% set pie_outlier_header = pred_0_label %}
+                                            {% set pie_info_icon_title = "Shows distributions for cases " ~ pred_1_label ~ " vs. " ~ pred_0_label ~ " across other protected attributes." %}
+                                            {% set pie_non_outlier_case_desc = "Composition of individuals " ~ pred_1_label ~ "." %}
+                                            {% set pie_outlier_case_desc = "Composition of individuals " ~ pred_0_label ~ "." %}
+                                        {% elif metric_name_concept == 'Equalized Odds' %}
+                                            {% set pie_non_outlier_header = true_positive_case %} {# TP #}
+                                            {% set pie_outlier_header = false_negative_case %} {# FN #}
+                                            {% set pie_info_icon_title = "Shows distributions for " ~ true_positive_case ~ " vs. " ~ false_negative_case ~ " cases across other protected attributes (conditioned on true outcome being '" ~ pos_outcome_label ~ "')." %}
+                                            {% set pie_non_outlier_case_desc = "Composition of " ~ true_positive_case ~ " cases." %}
+                                            {% set pie_outlier_case_desc = "Composition of " ~ false_negative_case ~ " cases." %}
+                                        {% elif metric_name_concept == 'Predictive Parity' %}
+                                            {# Predictive Parity (Precision = TP / (TP+FP) ), so for Pred=1: Non-Outlier=TP, Outlier=FP #}
+                                            {% set pie_non_outlier_header = true_positive_case %} {# TP (True=1, Pred=1) - "Non-Outlier" for Precision #}
+                                            {% set pie_outlier_header = false_positive_case %} {# FP (True=0, Pred=1) - "Outlier" for Precision #}
+                                            {% set pie_info_icon_title = "Shows distributions for " ~ true_positive_case ~ " vs. " ~ false_positive_case ~ " cases among those " ~ pred_1_label ~ ", across other protected attributes." %}
+                                            {% set pie_non_outlier_case_desc = "Composition of " ~ true_positive_case ~ " cases (among those " ~ pred_1_label ~ ")." %}
+                                            {% set pie_outlier_case_desc = "Composition of " ~ false_positive_case ~ " cases (among those " ~ pred_1_label ~ ")." %}
+                                        {% endif %}
+                                        {# --- End Pie Label Definitions --- #}
+
+                                        <div class="accordion-item metric-concept-accordion-item" data-metric-concept="{{ metric_name_concept }}">
+                                            <div class="accordion-header">
+                                                {{ metric_name_concept }} Distributions
+                                                <img src="{{ url_for('static', filename='infobutton.png') }}" alt="Info" class="info-img-icon" title="{{ pie_info_icon_title }}">
+                                            </div>
+                                            <div class="accordion-content">
+                                                {# --- Nested Accordion for Outlier Cases --- #}
+                                                <div class="accordion-item pie-sub-accordion" data-pie-type="outliers">
+                                                    <div class="accordion-header">Distribution for {{ pie_outlier_header }} Cases</div>
+                                                    <div class="accordion-content pie-chart-section">
+                                                         <p class="outlier-description">{{ pie_outlier_case_desc }}</p>
+                                                        {% for group_name_pie in current_groups.keys() | sort %}
+                                                            {% if pie_chart_data[attribute][group_name_pie][metric_name_concept]['outliers'] is defined %}
+                                                                <div class="pie-group-container" data-group-name="{{ group_name_pie }}">
+                                                                    <h5 style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #eee;">Group: {{ group_name_pie }}</h5>
+                                                                    <div class="pie-chart-grid">
+                                                                        {% for other_attr in protected_cols %}
+                                                                            {% if other_attr != attribute %}
+                                                                                {% if pie_chart_data[attribute][group_name_pie][metric_name_concept]['outliers'][other_attr] is defined %}
+                                                                                    <div class="pie-chart-container">
+                                                                                        <h6>Distribution by {{ other_attr.replace('_',' ').title() }}</h6>
+                                                                                        <canvas id="pie-outlier-{{ attribute }}-{{ group_name_pie }}-{{ metric_name_concept }}-{{ other_attr }}" data-primary-attr="{{ attribute }}" data-group-name="{{ group_name_pie }}" data-metric-name="{{ metric_name_concept }}" data-other-attr="{{ other_attr }}" data-type="outliers"></canvas>
+                                                                                    </div>
+                                                                                 {% endif %}
+                                                                            {% endif %}
+                                                                        {% endfor %}
+                                                                    </div>
+                                                                </div>
+                                                            {% endif %}
+                                                        {% else %}
+                                                            {% if loop.first %}<p class="no-outliers">No groups found with '{{ pie_outlier_header }}' cases for this analysis.</p>{% endif %}
+                                                        {% endfor %}
+                                                    </div>
+                                                </div>
+
+                                                {# --- Nested Accordion for Non-Outlier Cases --- #}
+                                                <div class="accordion-item pie-sub-accordion" data-pie-type="non_outliers">
+                                                    <div class="accordion-header">Distribution for {{ pie_non_outlier_header }} Cases</div>
+                                                    <div class="accordion-content pie-chart-section">
+                                                        <p class="outlier-description">{{ pie_non_outlier_case_desc }}</p>
+                                                        {% for group_name_pie in current_groups.keys() | sort %}
+                                                             {% if pie_chart_data[attribute][group_name_pie][metric_name_concept]['non_outliers'] is defined %}
+                                                                <div class="pie-group-container" data-group-name="{{ group_name_pie }}">
+                                                                    <h5 style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #eee;">Group: {{ group_name_pie }}</h5>
+                                                                    <div class="pie-chart-grid">
+                                                                        {% for other_attr in protected_cols %}
+                                                                            {% if other_attr != attribute %}
+                                                                                {% if pie_chart_data[attribute][group_name_pie][metric_name_concept]['non_outliers'][other_attr] is defined %}
+                                                                                    <div class="pie-chart-container">
+                                                                                        <h6>Distribution by {{ other_attr.replace('_',' ').title() }}</h6>
+                                                                                        <canvas id="pie-non_outlier-{{ attribute }}-{{ group_name_pie }}-{{ metric_name_concept }}-{{ other_attr }}" data-primary-attr="{{ attribute }}" data-group-name="{{ group_name_pie }}" data-metric-name="{{ metric_name_concept }}" data-other-attr="{{ other_attr }}" data-type="non_outliers"></canvas>
+                                                                                    </div>
+                                                                                {% endif %}
+                                                                            {% endif %}
+                                                                        {% endfor %}
+                                                                    </div>
+                                                                </div>
+                                                            {% endif %}
+                                                        {% else %}
+                                                            {% if loop.first %}<p class="no-outliers">No groups found with '{{ pie_non_outlier_header }}' cases for this analysis.</p>{% endif %}
+                                                        {% endfor %}
+                                                    </div>
+                                                </div>
+
+                                            </div> {# End accordion-content for metric concept #}
+                                        </div> {# End accordion-item for metric concept #}
+                                    {% endfor %}
+                                {% elif protected_cols|length < 2 %}
+                                    <p class="no-outliers">Select at least two protected attributes in the controls sidebar and re-run to enable cross-attribute distribution analysis.</p>
+                                {% else %}
+                                     <p class="no-outliers">Cross-attribute distribution data could not be generated for this combination of attributes and metrics.</p>
+                                {% endif %}
+                                <!-- End Pie Chart Section -->
+
+                            {% else %}
+                                <p class="no-metrics">No fairness metrics calculated for groups within '{{ attribute }}'.</p>
+                            {% endif %} {# End if current_groups #}
+                        </div> {# End main accordion-content (Attribute) #}
+                    </div> {# End main accordion-item (Attribute) #}
+                {% endfor %} {# End loop protected_cols #}
+            {% else %}
+                 <p class="no-metrics">No fairness results available for the current run.</p>
+            {% endif %} {# End if current_fairness_results #}
+
+
+            <!-- Proxy Analysis Display (unchanged) -->
+             {% if proxy_analysis_results is defined and proxy_analysis_results %}
+            <hr>
+            <div class="proxy-analysis-display">
+                <h3>Feature Correlation with Protected Attributes (Potential Proxies) <img src="{{ url_for('static', filename='infobutton.png') }}" alt="Info" class="info-img-icon" title="Highlights features statistically associated with protected attributes. Significance thresholds: ANOVA p-value < 0.05 or Cramer's V > 0.15. Features correlated with protected attributes might act as proxies, potentially leading to indirect discrimination even if the protected attribute itself isn't used in the model."></h3>
+                <p style="font-size:0.9em; color:#555;">Highlights features statistically associated with protected attributes. Significance thresholds: ANOVA p-value < 0.05 or Cramer's V > 0.15.</p>
+                {% for p_attr, results in proxy_analysis_results.items() %}
+                    <div class="accordion-item">
+                        <div class="accordion-header">{{ p_attr.replace('_',' ').title() }} - Potential Proxies</div>
+                         <div class="accordion-content">
+                            {% if results %}
+                                <table class="detail-table">
+                                    <thead><tr><th>Feature</th><th>Test Type</th><th>Value</th><th>p-value (ANOVA)</th><th>Significant</th><th>Subgroup Details (Mean / Mode)</th></tr></thead>
+                                    <tbody>
+                                        {% for feature, stats in results.items() %}
+                                            <tr class="{{ 'significant-row' if stats.significant else '' }}" {% if stats.significant %}title="Potentially significant proxy feature: Consider impact on fairness."{% endif %}>
+                                                <td>{{ feature }}</td><td>{{ stats.test_type }}</td>
+                                                <td class="metric-value">{% if stats.value is number and stats.value == stats.value %}{{ "%.3f"|format(stats.value) }}{% else %}N/A{% endif %}</td>
+                                                <td class="metric-value">{% if stats.test_type == "ANOVA" and stats.p_value is number and stats.p_value == stats.p_value %}{{ "%.3f"|format(stats.p_value) }}{% else %}-{% endif %}</td>
+                                                <td class="{% if stats.significant %}significant-yes{% endif %}">{{ 'Yes' if stats.significant else 'No' }}</td>
+                                                <td class="subgroup-detail-item">
+                                                    {% if stats.subgroup_details %}
+                                                        {% for group, detail in stats.subgroup_details.items() %}<div><strong>{{ group }}:</strong> {% if detail is number %}{{ "%.2f"|format(detail) }}{% else %}{{ detail | default('N/A') }}{% endif %}</div>{% endfor %}
+                                                    {% elif stats.significant %}(Details N/A){% else %}-{% endif %}
+                                                 </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            {% else %}
+                                <p class="no-metrics">No statistically significant correlations found between features and '{{ p_attr }}'.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <!-- End Proxy Analysis Display -->
+
+        </div> <!-- End results-area -->
+    </div> <!-- End main-content-area -->
+
+    <!-- Footer Links -->
+    <div class="footer-links">
+        <a href="{{ url_for('configure') }}">Configure New Analysis</a> |
+        <a href="{{ url_for('dashboard') }}">Upload New Dataset</a> |
+         <a href="{{ url_for('landing') }}">Back to Start</a>
+
+    </div>
+</div> <!-- End container -->
+
+<!-- History Modal -->
+<div id="history-modal" style="display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);">
+    <div style="background-color: #fefefe; margin: 5% auto; padding: 25px; border: 1px solid #888; width: 80%; max-width: 900px; border-radius: var(--border-radius); position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.2);">
+        <span id="history-modal-close" style="position: absolute; top: 10px; right: 20px; color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
+        <h4 id="history-modal-title" style="margin-top: 0; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">Run History</h4>
+        <div id="history-chart-container" style="height: 400px;">
+            <canvas id="history-chart"></canvas>
+        </div>
+        <p id="history-modal-message" style="text-align: center; margin-top: 15px; font-style: italic; color: var(--secondary-color); display: none;"></p>
+    </div>
+</div>
+<!-- End History Modal -->
+
+<!-- Individual Details Modal -->
+<div id="individual-details-modal" style="display: none; position: fixed; z-index: 1060; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6);">
+    <div style="background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 85%; max-width: 1000px; border-radius: var(--border-radius); position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.2);">
+        <span id="individual-details-modal-close" style="position: absolute; top: 10px; right: 20px; color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
+        <h4 id="individual-details-modal-title" style="margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">Individuals in Selected Segment</h4>
+        <div id="individual-details-table-container" style="max-height: 60vh; overflow-y: auto;">
+            <!-- Table will be injected here by JS -->
+        </div>
+        <p id="individual-details-modal-message" style="text-align: center; margin-top: 15px; font-style: italic; color: var(--secondary-color); display: none;"></p>
+    </div>
+</div>
+<!-- End Individual Details Modal -->
+
+
+{# Embed data for JS #}
+<script>
+    // --- Data from Flask ---
+    const outcomePolarity = {{ outcome_polarity | tojson | safe }};
+    const pieDataStore = {{ pie_chart_data | tojson | safe }};
+    const individualsStore = {{ individual_details_map | default({}) | tojson | safe }}; // Use default for individual_details_map
+    const runHistoryData = {{ run_history | tojson | safe }};
+    const protectedAttributesList = {{ protected_cols | tojson | safe }};
+    const modelConfigFromFlask = {{ model_config | tojson | safe }}; // For sidebar pre-fill
+    const originalUploadedModelTypeFromFlask = {{ original_uploaded_model_type | tojson | safe }}; // For sidebar pre-fill and note
+    // --- End Data from Flask ---
+
+
+     // Define case labels in JS based on polarity for icon click handler alerts
+     const jsLabels = {
+        positive: { pred_1: "Predicted Positive Outcome", pred_0: "Predicted Negative Outcome", tp_case: "True Positive", fn_case: "False Negative", fp_case: "False Positive", tn_case: "True Negative" },
+        negative: { pred_1: "Predicted Negative Outcome", pred_0: "Predicted Positive Outcome", tp_case: "True Positive", fn_case: "False Negative", fp_case: "False Positive", tn_case: "True Negative" } // Use standard cases
+    };
+    const currentLabels = jsLabels[outcomePolarity] || jsLabels['positive'];
+
+    // Define labels and styles for History Chart
+    const historyMetricLabels = {
+        accuracy: 'Overall Accuracy',
+        dp_max_diff: 'DP Max Difference',
+        eo_overall_score: 'EO Overall Score',
+        pp_max_diff: 'PP Max Difference'
+    };
+    const historyChartColors = {
+        accuracy: 'rgba(0, 123, 255, 0.8)', // Blue
+        dp_max_diff: 'rgba(255, 193, 7, 0.8)',  // Yellow
+        eo_overall_score: 'rgba(220, 53, 69, 0.8)', // Red
+        pp_max_diff: 'rgba(23, 162, 184, 0.8)'  // Teal
+    };
+    const historyPointStyles = {
+        accuracy: 'circle',
+        dp_max_diff: 'rect',
+        eo_overall_score: 'triangle',
+        pp_max_diff: 'star'
+    };
+
+</script>
+
+<script>
+    // --- Utility Functions ---
+    function toggleBudgetGroups(attributeName) {
+        const checkbox = document.getElementById(`budget_enable_${attributeName}`);
+        const groupsDiv = document.getElementById(`budget_groups_${attributeName}`);
+        if (checkbox && groupsDiv) { groupsDiv.style.display = checkbox.checked ? 'block' : 'none'; }
+    }
+
+    function showSidebarHyperparameters(modelType) {
+        document.querySelectorAll('.hyperparameter-section-sidebar').forEach(section => { section.style.display = 'none'; });
+        const selectedSection = document.getElementById(`sidebar-params-${modelType}`);
+        if (selectedSection) { selectedSection.style.display = 'block'; }
+
+        // Show/hide Budgeting section based on model type
+        const budgetSection = document.getElementById('budgeting-control-section');
+        if(budgetSection){
+            budgetSection.style.display = (modelType === 'upload_model') ? 'none' : 'block';
+        }
+    }
+
+
+    function generateChartColors(numColors) {
+        const colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6c757d', '#6610f2', '#e83e8c', '#fd7e14', '#20c997', '#343a40', '#adb5bd'];
+        let result = [];
+        for (let i = 0; i < numColors; i++) { result.push(colors[i % colors.length]); }
+        return result;
+    }
+
+    function sortMetricGroups(containerId, sortKeyAttribute, sortOrder) {
+        const container = document.getElementById(containerId);
+        if (!container) { return; }
+        const items = Array.from(container.querySelectorAll('.metric-group-item'));
+        const compareFn = (a, b) => {
+            const nameA = a.dataset.groupName || ''; const nameB = b.dataset.groupName || '';
+            let scoreA = parseFloat(a.dataset['score'] || -999); let scoreB = parseFloat(b.dataset['score'] || -999);
+            const isInvalidA = isNaN(scoreA) || scoreA === -999; const isInvalidB = isNaN(scoreB) || scoreB === -999;
+            if (sortOrder === 'default') { return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' }); }
+            if (isInvalidA && isInvalidB) return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+            if (isInvalidA) return sortOrder === 'low-high' ? 1 : -1; if (isInvalidB) return sortOrder === 'low-high' ? -1 : 1;
+            if (sortOrder === 'high-low') { return scoreB - scoreA; }
+            else if (sortOrder === 'low-high') { return scoreA - scoreB; } return 0;
+        };
+        items.sort(compareFn); items.forEach(item => container.appendChild(item));
+    }
+
+    function ensureVisible(element) {
+        let current = element;
+        while (current && current !== document.body) {
+            if (current.classList.contains('accordion-item') && !current.classList.contains('active')) {
+                 const isTopLevelAttributeAccordion = current.parentElement.classList.contains('results-area');
+                 if (!isTopLevelAttributeAccordion) { current.classList.add('active'); }
+             }
+             if (current.classList.contains('accordion-content')) {
+                 const parentItem = current.closest('.accordion-item');
+                 if (parentItem && !parentItem.classList.contains('active')) {
+                     const isTopLevelAttributeAccordionParent = parentItem.parentElement.classList.contains('results-area');
+                     if (!isTopLevelAttributeAccordionParent) { parentItem.classList.add('active'); }
+                 }
+             }
+            current = current.parentElement;
+        }
+    }
+
+    function highlightElement(element) {
+        if (!element) return;
+        const highlightClass = 'highlight-scroll';
+        document.querySelectorAll('.' + highlightClass).forEach(el => el.classList.remove(highlightClass));
+        element.classList.add(highlightClass);
+        setTimeout(() => { element.classList.remove(highlightClass); }, 2000);
+    }
+
+    // --- Main Event Listener ---
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- Sidebar Rerun Form Loading Indicator Setup ---
+        const controlsForm = document.getElementById('controls-form');
+        const rerunButton = document.getElementById('rerun-button');
+        const sidebarLoadingOverlay = document.getElementById('loading-overlay-sidebar');
+        const sidebarLoadingText = document.getElementById('loading-text-sidebar');
+
+        if (controlsForm && rerunButton && sidebarLoadingOverlay) {
+            controlsForm.addEventListener('submit', function(event) {
+                sidebarLoadingOverlay.style.display = 'flex';
+                if (sidebarLoadingText) { sidebarLoadingText.textContent = "Re-running Analysis..."; }
+                rerunButton.disabled = true; rerunButton.classList.add('loading');
+            });
+        } else { console.error("Could not find controls form, rerun button, or sidebar loading overlay elements."); }
+
+        // Budget Toggle Setup
+        const budgetCheckboxes = document.querySelectorAll('input[name^="budget_enable_"]');
+        budgetCheckboxes.forEach(checkbox => {
+            const attributeName = checkbox.id.replace('budget_enable_', '');
+            if(attributeName) { toggleBudgetGroups(attributeName); checkbox.addEventListener('change', () => { toggleBudgetGroups(attributeName); }); }
+        });
+
+        // Sidebar Toggle Logic
+        const toggleBtn = document.getElementById('toggle-sidebar-btn');
+        const bodyEl = document.body;
+        const sidebarStateKey = 'sidebarCollapsedState';
+        const setSidebarState = (isCollapsed) => {
+            if (isCollapsed) { bodyEl.classList.add('sidebar-collapsed'); toggleBtn.textContent = '»'; toggleBtn.title = "Show Controls Sidebar"; localStorage.setItem(sidebarStateKey, 'true'); }
+            else { bodyEl.classList.remove('sidebar-collapsed'); toggleBtn.textContent = '«'; toggleBtn.title = "Hide Controls Sidebar"; localStorage.setItem(sidebarStateKey, 'false'); }
+        };
+        const initialStateCollapsed = localStorage.getItem(sidebarStateKey) === 'true';
+        setSidebarState(initialStateCollapsed);
+        if (toggleBtn) { toggleBtn.addEventListener('click', () => { setSidebarState(!bodyEl.classList.contains('sidebar-collapsed')); }); }
+
+        // Accordion Logic
+        const resultsAreaGlobal = document.querySelector('.results-area');
+        if (resultsAreaGlobal) {
+            resultsAreaGlobal.addEventListener('click', function(event) {
+                const header = event.target.closest('.accordion-header');
+                 // Prevent accordion toggle if history button or other interactive elements are clicked
+                if (!header || event.target.closest('.icon-group-clickable') || event.target.closest('.sort-controls') || event.target.closest('.view-history-btn') || event.target.closest('.info-img-icon') ) { return; }
+                const item = header.closest('.accordion-item');
+                if (!item) return;
+                item.classList.toggle('active');
+            });
+        }
+
+        // Initial check for sidebar hyperparameters using modelConfigFromFlask and originalUploadedModelTypeFromFlask
+        let initialModelTypeForSidebar = modelConfigFromFlask?.type || 'logistic_regression';
+        if (originalUploadedModelTypeFromFlask && originalUploadedModelTypeFromFlask !== 'Unknown') {
+            const detectedTypeNormSidebar = originalUploadedModelTypeFromFlask.toLowerCase();
+            if ('logisticregression'.includes(detectedTypeNormSidebar) || 'logistic_regression'.includes(detectedTypeNormSidebar)) {
+                initialModelTypeForSidebar = 'logistic_regression';
+            } else if ('svm'.includes(detectedTypeNormSidebar) || 'svc'.includes(detectedTypeNormSidebar)) {
+                initialModelTypeForSidebar = 'svm';
+            } else if (modelConfigFromFlask?.type === 'upload_model') {
+                initialModelTypeForSidebar = 'logistic_regression';
+            }
+        } else if (modelConfigFromFlask?.type === 'upload_model') {
+             initialModelTypeForSidebar = 'logistic_regression';
+        }
+
+        const radioToCheck = document.querySelector(`#model-type-group-sidebar input[name="model_type"][value="${initialModelTypeForSidebar}"]`);
+        if (radioToCheck) {
+            radioToCheck.checked = true;
+        } else {
+            document.querySelector('#model-type-group-sidebar input[name="model_type"][value="logistic_regression"]').checked = true;
+            initialModelTypeForSidebar = 'logistic_regression';
+        }
+        showSidebarHyperparameters(initialModelTypeForSidebar);
+
+
+        // Feature Selection Styling (Sidebar)
+        const sidebarFeatureLabels = document.querySelectorAll('#feature_select label.feature-label');
+        sidebarFeatureLabels.forEach(label => { const cb = label.querySelector('input[type="checkbox"]'); if (cb && cb.disabled) { label.classList.add('disabled-label'); } });
+
+        // Attach Overarching Sort Event Listeners & Trigger Default Sort
+        document.querySelectorAll('.metric-sort-select-overall').forEach(selectElement => {
+            selectElement.addEventListener('change', (event) => {
+                const selectedOrder = event.target.value; const attribute = event.target.dataset.attribute;
+                sortMetricGroups(`groups-dp-${attribute}`, 'score', selectedOrder);
+                sortMetricGroups(`groups-eo-${attribute}`, 'score', selectedOrder);
+                sortMetricGroups(`groups-pp-${attribute}`, 'score', selectedOrder);
+            });
+            const attributeToSort = selectElement.dataset.attribute;
+            sortMetricGroups(`groups-dp-${attributeToSort}`, 'score', 'default');
+            sortMetricGroups(`groups-eo-${attributeToSort}`, 'score', 'default');
+            sortMetricGroups(`groups-pp-${attributeToSort}`, 'score', 'default');
+        });
+
+         // Icon Click to Pie Chart Scroll Logic
+        const resultsAreaForIcons = document.querySelector('.results-area');
+        if (resultsAreaForIcons) {
+             resultsAreaForIcons.addEventListener('click', function(event) {
+                const iconGroupSpan = event.target.closest('.icon-group-clickable');
+                if (!iconGroupSpan) return;
+                event.preventDefault();
+
+                const iconType = iconGroupSpan.dataset.iconType; const vizContainer = iconGroupSpan.closest('.icon-viz-container');
+                const groupItem = iconGroupSpan.closest('.metric-group-item'); const attributeContent = iconGroupSpan.closest('.attribute-accordion-content');
+                if (!iconType || !vizContainer || !groupItem || !attributeContent) { console.error("[Icon Group Click] Could not find context."); return; }
+
+                const metricViz = vizContainer.dataset.metricViz; const groupName = groupItem.dataset.groupName; const primaryAttribute = attributeContent.dataset.attribute;
+                let targetMetricConcept = ''; let targetPieType = ''; let isValidClick = true;
+                let caseLabelForAlert = "";
+
+                 switch (metricViz) {
+                    case 'dp':
+                        targetMetricConcept = 'Demographic Parity';
+                        targetPieType = (iconType === 'colored') ? 'non_outliers' : 'outliers';
+                        caseLabelForAlert = (iconType === 'colored') ? currentLabels.pred_1 : currentLabels.pred_0;
+                        break;
+                    case 'eo-tpr': // TP vs FN (among True Positives)
+                        targetMetricConcept = 'Equalized Odds';
+                        targetPieType = (iconType === 'colored') ? 'non_outliers' : 'outliers'; // colored=TP (non_outlier), uncolored=FN (outlier)
+                        caseLabelForAlert = (iconType === 'colored') ? currentLabels.tp_case : currentLabels.fn_case;
+                        break;
+                    case 'eo-fpr': // FP vs TN (among True Negatives)
+                        targetMetricConcept = 'Predictive Parity'; // Pie chart for PP stores FP as outlier, TN as non-outlier
+                        targetPieType = (iconType === 'colored') ? 'outliers' : 'non_outliers'; // colored=FP (outlier), uncolored=TN (non_outlier)
+                        caseLabelForAlert = (iconType === 'colored') ? currentLabels.fp_case : currentLabels.tn_case;
+                        break;
+                    case 'pp': // TP vs FP (among Predicted Positives)
+                        targetMetricConcept = 'Predictive Parity';
+                        targetPieType = (iconType === 'colored') ? 'non_outliers' : 'outliers'; // colored=TP (non_outlier for precision), uncolored=FP (outlier for precision)
+                        caseLabelForAlert = (iconType === 'colored') ? currentLabels.tp_case : currentLabels.fp_case;
+                        break;
+                    default: console.error(`[Icon Group Click] Unknown metric viz type: ${metricViz}`); isValidClick = false;
+                }
+                if (!isValidClick) return;
+
+                const targetConceptAccordion = attributeContent.querySelector(`.metric-concept-accordion-item[data-metric-concept="${targetMetricConcept}"]`);
+                if (!targetConceptAccordion) { alert(`Pie chart distributions for ${targetMetricConcept} are not available for attribute '${primaryAttribute}'.`); return; }
+
+                const targetTypeAccordion = targetConceptAccordion.querySelector(`.accordion-item.pie-sub-accordion[data-pie-type="${targetPieType}"]`);
+                 if (!targetTypeAccordion) {
+                    alert(`Pie chart section for '${caseLabelForAlert}' cases in ${targetMetricConcept} is not available.`); return;
+                 }
+                const targetGroupContainer = targetTypeAccordion.querySelector(`.accordion-content .pie-group-container[data-group-name="${groupName}"]`);
+                if (!targetGroupContainer) { alert(`Pie chart distributions for group '${groupName}' (type: ${caseLabelForAlert}) within ${targetMetricConcept} are not available.`); return; }
+
+                ensureVisible(targetGroupContainer);
+                setTimeout(() => { targetGroupContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); highlightElement(targetGroupContainer); }, 450);
+             });
+        }
+
+        // --- PIE CHART RENDERING LOGIC (MODIFIED for onClick) ---
+        if (typeof pieDataStore !== 'undefined' && pieDataStore && Object.keys(pieDataStore).length > 0) {
+            const pieCanvases = document.querySelectorAll('canvas[id^="pie-"]');
+            pieCanvases.forEach((canvas) => {
+                const primaryAttr = canvas.dataset.primaryAttr;
+                const groupName = canvas.dataset.groupName;
+                const metricName = canvas.dataset.metricName;
+                const otherAttr = canvas.dataset.otherAttr;
+                const dataType = canvas.dataset.type;
+
+                if (primaryAttr && groupName && metricName && otherAttr && dataType) {
+                     const chartDataSegment = pieDataStore?.[primaryAttr]?.[groupName]?.[metricName]?.[dataType]?.[otherAttr];
+                     if (chartDataSegment && chartDataSegment.labels && chartDataSegment.labels.length > 0 && chartDataSegment.values && chartDataSegment.values.length > 0) {
+                        const ctx = canvas.getContext('2d');
+                        try {
+                             new Chart(ctx, {
+                                type: 'pie',
+                                data: {
+                                    labels: chartDataSegment.labels,
+                                    datasets: [{
+                                        label: `Distribution by ${otherAttr}`,
+                                        data: chartDataSegment.values,
+                                        backgroundColor: generateChartColors(chartDataSegment.labels.length),
+                                        borderColor: '#ffffff',
+                                        borderWidth: 1
+                                    }]
+                                },
+                                options: {
+                                    responsive: true, maintainAspectRatio: false, aspectRatio: 1.5,
+                                    plugins: {
+                                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: function(context) {
+                                                    let label = context.label || '';
+                                                    if (label) { label += ': '; }
+                                                    if (context.parsed !== null) {
+                                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                                        const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) + '%' : '0%';
+                                                        label += context.formattedValue + ' (' + percentage + ')';
+                                                    }
+                                                    return label;
+                                                }
+                                            }
+                                        },
+                                        title: { display: false }
+                                    },
+                                    onClick: function(event, elements) { // ADDED/MODIFIED onClick
+                                        if (elements.length > 0) {
+                                            const chartInstance = this; // 'this' is the chart instance
+                                            const canvasEl = chartInstance.canvas;
+                                            const firstPoint = elements[0];
+                                            const clickedSegmentLabel = chartInstance.data.labels[firstPoint.index];
+
+                                            // Retrieve data attributes from the canvas dataset, or from outer scope where canvas was iterated
+                                            const pAttr = canvasEl.dataset.primaryAttr;
+                                            const grpName = canvasEl.dataset.groupName;
+                                            const mName = canvasEl.dataset.metricName;
+                                            const oAttr = canvasEl.dataset.otherAttr;
+                                            const dType = canvasEl.dataset.type;
+
+                                            const segmentInfo = pieDataStore?.[pAttr]?.[grpName]?.[mName]?.[dType]?.[oAttr];
+
+                                            if (!segmentInfo || !segmentInfo.segment_row_numbers) {
+                                                console.error("Could not find segment row numbers for:", pAttr, grpName, mName, dType, oAttr);
+                                                alert("Details for this segment are not available (data structure error).");
+                                                return;
+                                            }
+                                            // Make sure clickedSegmentLabel is exactly as in segment_row_numbers keys
+                                            const rowNumbersForSegment = segmentInfo.segment_row_numbers[clickedSegmentLabel];
+
+
+                                            if (rowNumbersForSegment && Array.isArray(rowNumbersForSegment)) {
+                                                displayIndividualDetailsModal(rowNumbersForSegment, individualsStore, clickedSegmentLabel, pAttr, grpName, mName, dType, oAttr);
+                                            } else {
+                                                console.warn(`No individuals array found for segment: '${clickedSegmentLabel}'. Data:`, segmentInfo.segment_row_numbers, "Full segmentInfo:", segmentInfo);
+                                                alert(`No individuals found for segment: '${clickedSegmentLabel}'. Check console for details.`);
+                                            }
+                                        }
+                                    } // End onClick
+                                }
+                             });
+                        } catch (chartError) { console.error(`[Pie Charts] Error creating chart for ${canvas.id}:`, chartError); const container = canvas.parentElement; if(container) container.innerHTML += '<p style="color:red; font-size:0.8em;">Chart Error</p>'; }
+                     } else { const container = canvas.parentElement; if(container) { if (document.getElementById(canvas.id)) { canvas.remove(); if (!container.querySelector('.no-outliers')) { container.innerHTML += '<p class="no-outliers" style="margin-top:20px;">(No data)</p>'; } } } }
+                } else { console.error(`[Pie Charts] Canvas missing essential data attributes: ${canvas.id}`, canvas.dataset); const container = canvas.parentElement; if (container && document.getElementById(canvas.id)) { canvas.remove(); if (!container.querySelector('.no-outliers')) { container.innerHTML += '<p class="no-outliers" style="margin-top:20px;">(Chart Config Error)</p>'; } } }
+            });
+        } else {
+            const pieSectionCheck = document.querySelector('.metric-concept-accordion-item');
+            if(pieSectionCheck) {
+                const attributeContents = document.querySelectorAll('.attribute-accordion-content');
+                attributeContents.forEach(content => {
+                    const h4Check = content.querySelector('h4');
+                    if (h4Check && h4Check.textContent.includes('Cross-Attribute Distribution Analysis')) {
+                         const subAccordions = content.querySelector('.metric-concept-accordion-item');
+                         if (!subAccordions && !content.querySelector('.no-outliers')) { h4Check.insertAdjacentHTML('afterend', '<p class="no-outliers">Cross-attribute distribution data is not available for this run.</p>'); }
+                    }
+                });
+            }
+        }
+        // --- End Pie Chart Logic ---
+
+        // --- History Modal Logic ---
+        const historyModal = document.getElementById('history-modal');
+        const historyModalClose = document.getElementById('history-modal-close');
+        const historyModalTitle = document.getElementById('history-modal-title');
+        const historyChartCanvas = document.getElementById('history-chart');
+        const historyModalMessage = document.getElementById('history-modal-message');
+        let historyChartInstance = null;
+
+        const closeHistoryModal = () => {
+            if (historyModal) historyModal.style.display = 'none';
+            if (historyChartInstance) { historyChartInstance.destroy(); historyChartInstance = null; }
+             historyModalMessage.style.display = 'none'; historyModalMessage.textContent = ''; historyChartCanvas.style.display = 'block';
+        };
+        if (historyModalClose) { historyModalClose.onclick = closeHistoryModal; }
+        if (historyModal) { historyModal.onclick = function(event) { if (event.target === historyModal) { closeHistoryModal(); } } }
+
+        document.querySelectorAll('.view-history-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const attributeName = this.dataset.attribute;
+                if (!attributeName) { console.error("History button clicked but attribute name is missing."); return; }
+
+                 if (!runHistoryData || runHistoryData.length < 2) {
+                    historyModalTitle.textContent = `Run History for ${attributeName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
+                    historyModalMessage.textContent = "At least two runs are needed to display history.";
+                    historyModalMessage.style.display = 'block'; historyChartCanvas.style.display = 'none'; historyModal.style.display = 'block';
+                    return;
+                }
+
+                const labels = runHistoryData.map(run => `Run ${run.run_id}`);
+                const accuracyData = runHistoryData.map(run => run.accuracy);
+                const dpData = runHistoryData.map(run => run.overall_scores?.[attributeName]?.dp_max_diff ?? null);
+                const eoData = runHistoryData.map(run => run.overall_scores?.[attributeName]?.eo_overall_score ?? null);
+                const ppData = runHistoryData.map(run => run.overall_scores?.[attributeName]?.pp_max_diff ?? null);
+
+                if (historyChartInstance) { historyChartInstance.destroy(); }
+                 historyModalMessage.style.display = 'none'; historyChartCanvas.style.display = 'block';
+
+                const ctx = historyChartCanvas.getContext('2d');
+                historyChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: historyMetricLabels.accuracy, data: accuracyData, borderColor: historyChartColors.accuracy, backgroundColor: historyChartColors.accuracy.replace('0.8', '0.1'), tension: 0.1, spanGaps: true, pointStyle: historyPointStyles.accuracy, pointRadius: 5, pointHoverRadius: 7 },
+                            { label: `${historyMetricLabels.dp_max_diff} (${attributeName})`, data: dpData, borderColor: historyChartColors.dp_max_diff, backgroundColor: historyChartColors.dp_max_diff.replace('0.8', '0.1'), tension: 0.1, spanGaps: true, pointStyle: historyPointStyles.dp_max_diff, pointRadius: 5, pointHoverRadius: 7 },
+                            { label: `${historyMetricLabels.eo_overall_score} (${attributeName})`, data: eoData, borderColor: historyChartColors.eo_overall_score, backgroundColor: historyChartColors.eo_overall_score.replace('0.8', '0.1'), tension: 0.1, spanGaps: true, pointStyle: historyPointStyles.eo_overall_score, pointRadius: 5, pointHoverRadius: 7 },
+                            { label: `${historyMetricLabels.pp_max_diff} (${attributeName})`, data: ppData, borderColor: historyChartColors.pp_max_diff, backgroundColor: historyChartColors.pp_max_diff.replace('0.8', '0.1'), tension: 0.1, spanGaps: true, pointStyle: historyPointStyles.pp_max_diff, pointRadius: 5, pointHoverRadius: 7 }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            title: { display: false },
+                            legend: { position: 'bottom' },
+                            tooltip: {
+                                mode: 'index', intersect: false,
+                                callbacks: {
+                                     title: function(tooltipItems) {
+                                         const runIndex = tooltipItems[0]?.dataIndex;
+                                         if (runIndex !== undefined && runHistoryData[runIndex]) {
+                                             const runData = runHistoryData[runIndex];
+                                             let title = `Run ${runData.run_id}`;
+                                             return title;
+                                         } return '';
+                                     },
+                                     label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) { label += ': '; }
+                                        if (context.parsed.y !== null && !isNaN(context.parsed.y)) {
+                                            label += context.parsed.y.toFixed(3);
+                                        } else { label += 'N/A'; }
+                                        return label;
+                                     },
+                                     afterBody: function(tooltipItems) { // Shows config details
+                                         const runIndex = tooltipItems[0]?.dataIndex;
+                                         if (runIndex === undefined || !runHistoryData[runIndex]?.config) { return ['(Config details N/A)']; }
+                                         const config = runHistoryData[runIndex].config;
+                                         const details = ['--- Config ---'];
+                                         let modelStr = config.model_type || 'N/A';
+                                         if (config.model_params && Object.keys(config.model_params).length > 0 && config.model_params !== "N/A (Pre-trained)") {
+                                             const paramsStr = Object.entries(config.model_params).map(([k, v]) => `${k}=${v}`).join(', ');
+                                             modelStr += ` (${paramsStr})`;
+                                         } else if (config.model_params === "N/A (Pre-trained)") {
+                                             modelStr += " (Pre-trained)";
+                                         }
+                                         details.push(`Model: ${modelStr}`);
+                                         details.push(`Features Used: ${config.num_selected_features ?? 'N/A'}`);
+                                         details.push(`Outcome (1): ${config.outcome_polarity === 'positive' ? 'Positive' : (config.outcome_polarity === 'negative' ? 'Negative' : 'N/A')}`);
+                                         let budgetDetail = `Budgeting: ${config.budget_active ? 'Applied' : 'Not Applied'}`;
+                                         if (config.budget_active && config.budget_settings_summary && Object.keys(config.budget_settings_summary).length > 0) {
+                                             const budgetSummaryParts = [];
+                                             for (const [attr, groups] of Object.entries(config.budget_settings_summary)) {
+                                                 if (Object.keys(groups).length > 0) { // Only include if groups have limits
+                                                    const groupLimits = Object.entries(groups).map(([grp, lim]) => `${grp}=${lim ?? 'All'}`).join(', ');
+                                                    budgetSummaryParts.push(`${attr} (${groupLimits})`);
+                                                 }
+                                             }
+                                             if (budgetSummaryParts.length > 0) { budgetDetail += ` (${budgetSummaryParts.join('; ')})`; }
+                                         }
+                                         details.push(budgetDetail);
+                                         details.push(`Proxy Check: ${config.proxy_enabled ? 'Enabled' : 'Disabled'}`);
+                                         return details;
+                                     }
+                                }
+                             }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, title: { display: true, text: 'Metric Value' } },
+                            x: { title: { display: true, text: 'Run Number' } }
+                        },
+                        interaction: { mode: 'nearest', axis: 'x', intersect: false }
+                    }
+                });
+                historyModalTitle.textContent = `Run History for ${attributeName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
+                historyModal.style.display = 'block';
+            });
+        });
+        // --- End History Modal Logic ---
+
+
+        // --- Individual Details Modal Logic ---
+        function displayIndividualDetailsModal(rowNumbers, individualsDataMap, segmentLabel, pAttr, pAttrGroup, metric, type, distAttr) {
+            const modal = document.getElementById('individual-details-modal');
+            const modalTitleEl = document.getElementById('individual-details-modal-title');
+            const tableContainer = document.getElementById('individual-details-table-container');
+            const modalMessage = document.getElementById('individual-details-modal-message');
+
+            tableContainer.innerHTML = ''; // Clear previous table
+            modalMessage.style.display = 'none';
+
+            let titleDesc = `Individuals: <strong>${distAttr.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} = ${segmentLabel}</strong>`;
+            titleDesc += `<br><small style="font-weight:normal; font-size:0.8em;">Context: ${pAttr.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} = ${pAttrGroup} | Case Type: ${metric} (${type})</small>`;
+            modalTitleEl.innerHTML = titleDesc;
+
+            if (!rowNumbers || rowNumbers.length === 0) {
+                modalMessage.textContent = "No individual data to display for this segment.";
+                modalMessage.style.display = 'block';
+                modal.style.display = 'block';
+                return;
+            }
+
+            let tableHTML = '<table class="detail-table" style="font-size:0.85rem;"><thead><tr><th>Row ID</th><th>True Outcome</th><th>Predicted Outcome</th>';
+            
+            const originalProtectedColsForTable = window.protectedAttributesList || [];
+            originalProtectedColsForTable.forEach(col => {
+                tableHTML += `<th>${col.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</th>`;
+            });
+            tableHTML += '</tr></thead><tbody>';
+
+            const posOutcomeDesc = (window.outcomePolarity === 'positive' ? "Positive" : "Negative") + " Outcome";
+            const negOutcomeDesc = (window.outcomePolarity === 'positive' ? "Negative" : "Positive") + " Outcome";
+
+            rowNumbers.forEach(rowNum => {
+                const details = individualsDataMap[String(rowNum)]; 
+                if (details) {
+                    tableHTML += '<tr>';
+                    tableHTML += `<td>${rowNum}</td>`; 
+                    
+                    const trueOutcomeVal = details.y_true; 
+                    const predOutcomeVal = details.y_pred; 
+
+                    const trueOutcomeDisplay = trueOutcomeVal === '1' ? `${trueOutcomeVal} (${posOutcomeDesc})` : `${trueOutcomeVal} (${negOutcomeDesc})`;
+                    const predOutcomeDisplay = predOutcomeVal === '1' ? `${predOutcomeVal} (${posOutcomeDesc})` : `${predOutcomeVal} (${negOutcomeDesc})`;
+
+                    tableHTML += `<td>${trueOutcomeDisplay}</td>`;
+                    tableHTML += `<td>${predOutcomeDisplay}</td>`;
+
+                    originalProtectedColsForTable.forEach(colName => {
+                        tableHTML += `<td>${details[colName] !== undefined && details[colName] !== null ? details[colName] : 'N/A'}</td>`;
+                    });
+                    tableHTML += '</tr>';
+                } else {
+                    console.warn("Details not found for row number:", rowNum, ". Available keys in individualsDataMap:", Object.keys(individualsDataMap).slice(0,10));
+                }
+            });
+            tableHTML += '</tbody></table>';
+            tableContainer.innerHTML = tableHTML;
+            modal.style.display = 'block';
+        }
+
+        const individualModalCloseBtn = document.getElementById('individual-details-modal-close');
+        if (individualModalCloseBtn) {
+            individualModalCloseBtn.onclick = function() {
+                document.getElementById('individual-details-modal').style.display = 'none';
+            }
+        }
+        const indDetailsModal = document.getElementById('individual-details-modal');
+        if (indDetailsModal) {
+            indDetailsModal.onclick = function(event) {
+                 if (event.target == indDetailsModal) {
+                    indDetailsModal.style.display = "none";
+                }
+            }
+        }
+        // --- End Individual Details Modal Logic ---
+
+
+    }); // End DOMContentLoaded
+</script>
+
+</body>
+</html>

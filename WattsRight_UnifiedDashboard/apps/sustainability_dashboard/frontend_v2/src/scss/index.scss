@@ -1,0 +1,60 @@
+@use 'variables';
+
+@use '../app/domains/ui/ui-domain';
+
+html {
+  font-size: var(--text-size-primary);
+  font-family: prompt, sans-serif;
+  color: var(--color-deeptrust);
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+  background-color: var(--color-background-primary);
+  height: 100vh;
+  width: 100vw;
+
+  .cdk-overlay-pane {
+    position: absolute;
+  }
+}
+
+h1 {
+  font-weight: 500 !important;
+  font-size: 2rem !important;
+  margin: 0 0 24px 0 !important;
+  font-family: prompt-header, sans-serif;
+}
+
+h2 {
+  font-weight: 500 !important;
+  font-size: 1.5rem !important;
+  margin: 0 0 8px 0 !important;
+  font-family: prompt-header, sans-serif;
+}
+
+a {
+  color: var(--color-deeptrust);
+  font-family: prompt, sans-serif;
+  transition: color 0.2s ease-in-out;
+  text-underline-offset: 4px;
+
+  &:hover {
+    color: var(--color-primary-accent);
+  }
+}
+
+hr {
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.overflow-y-scroll {
+  overflow-y: scroll !important;
+  scrollbar-width: none !important;
+}

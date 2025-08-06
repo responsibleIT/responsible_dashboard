@@ -1,0 +1,16 @@
+<div class="class-performance">
+  <span class="class-performance__label">
+    {{ metricName | titlecase }}
+  </span>
+  <app-benchmark-metric-bar
+    [label]="'Original'"
+    [value]="classPerformance.original"
+    [maxValue]="maxValue"
+  />
+  <app-benchmark-metric-bar
+    [label]="'Pruned'"
+    [value]="classPerformance.pruned"
+    [maxValue]="maxValue"
+    [pctChange]="pctChange"
+  />
+</div>

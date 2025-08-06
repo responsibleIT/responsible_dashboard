@@ -1,0 +1,96 @@
+:host {
+  width: 100%;
+}
+
+.benchmark-class-container {
+  border-radius: 10px;
+  border: 1px solid var(--border-color-primary);
+  overflow: hidden;
+
+  &.active {
+    .benchmark-class {
+      background-color: var(--color-eco-green);
+
+      &:hover {
+        background-color: var(--color-eco-green-accent) !important;
+        cursor: pointer;
+      }
+    }
+  }
+
+  .benchmark-class {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    height: 40px;
+    background-color: var(--color-white);
+    padding: 1.5rem;
+
+    h2 {
+      margin: 0 !important;
+    }
+
+    &__overview {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 1rem;
+
+      &__performance {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 1rem;
+
+        .value {
+          font-size: 1.2rem;
+          font-family: prompt-button, sans-serif;
+          color: var(--color-deeptrust);
+        }
+
+        .change {
+          font-size: 1.2rem;
+          font-weight: 500;
+          font-family: prompt-button, sans-serif;
+        }
+      }
+    }
+
+    &:hover {
+      background-color: var(--color-white-accent);
+      cursor: pointer;
+    }
+  }
+
+  .benchmark-class__details {
+    display: none;
+    background-color: var(--color-white);
+    padding: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+
+    // Default: try to fit items in a row
+    & > * {
+      flex: 1 1 calc(25% - 0.75rem); // 4 items per row by default
+      min-width: 200px; // Minimum width before wrapping
+    }
+
+    // When items become too small, switch to 2x2
+    @media (max-width: 1200px) {
+      & > * {
+        flex: 1 1 calc(50% - 0.5rem);
+      }
+    }
+
+    // On very small screens, stack vertically
+    @media (max-width: 600px) {
+      flex-direction: column;
+
+      & > * {
+        flex: 1 1 100%;
+        max-width: 100%;
+      }
+    }
+  }
+}

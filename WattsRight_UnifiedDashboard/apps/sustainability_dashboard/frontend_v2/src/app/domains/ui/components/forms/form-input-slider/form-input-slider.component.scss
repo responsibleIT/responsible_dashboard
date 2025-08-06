@@ -1,0 +1,95 @@
+:host {
+  width: 100%;
+}
+
+.form-input-slider {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  gap: 5px;
+
+  label {
+    color: var(--color-text-primary);
+    padding: 0 0 8px 0;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 10px;
+    background: #e8e8ec;
+    border-radius: 3px;
+    outline: none;
+    padding: 0;
+    margin: 10px 0;
+  }
+
+  /* Thumb styles (the blue dot) */
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #0066ff;
+    cursor: pointer;
+    border: none;
+    margin-top: -7px; /* Center the thumb vertically */
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #0066ff;
+    cursor: pointer;
+    border: none;
+  }
+
+  input[type="range"]::-ms-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #0066ff;
+    cursor: pointer;
+    border: none;
+  }
+
+  /* Track styles (the gray line) */
+  input[type="range"]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 6px;
+    cursor: pointer;
+    background: #e8e8ec;
+    border-radius: 3px;
+  }
+
+  input[type="range"]:focus::-webkit-slider-runnable-track {
+    background: #e8e8ec;
+  }
+
+  input[type="range"]::-moz-range-track {
+    width: 100%;
+    height: 6px;
+    cursor: pointer;
+    background: #e8e8ec;
+    border-radius: 3px;
+  }
+
+  input[type="range"]::-ms-track {
+    width: 100%;
+    height: 6px;
+    cursor: pointer;
+    background: transparent;
+    border-color: transparent;
+    color: transparent;
+  }
+
+  /* Ensure proper spacing */
+  input[type="range"] {
+    margin: 12px 0;
+  }
+}
