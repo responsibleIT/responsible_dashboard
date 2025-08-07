@@ -8,11 +8,10 @@ Press CTRL+C to quit
  * Restarting with stat
  * Debugger is active!
  * Debugger PIN: 124-269-535
-127.0.0.1 - - [07/Aug/2025 11:25:02] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2025 11:25:02] "GET /polyfills-FFHMD2TL.js HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2025 11:25:02] "GET /main-RH5XFIWA.js HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2025 11:25:02] "GET /media/Prompt-Regular-P4TSVTTS.ttf HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2025 11:25:02] "GET /styles-DK6ATAUY.css HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2025 11:25:03] "GET /media/Prompt-ExtraBold-KGLTF7YY.ttf HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2025 11:25:03] "GET /media/Prompt-Bold-RKSCCBKZ.ttf HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2025 11:25:03] "GET /favicon.ico HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2025 11:31:15] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [07/Aug/2025 11:31:15] "GET /polyfills-FFHMD2TL.js HTTP/1.1" 304 -
+127.0.0.1 - - [07/Aug/2025 11:31:15] "GET /main-RH5XFIWA.js HTTP/1.1" 304 -
+127.0.0.1 - - [07/Aug/2025 11:31:15] "GET /media/Prompt-Regular-P4TSVTTS.ttf HTTP/1.1" 304 -
+127.0.0.1 - - [07/Aug/2025 11:31:15] "GET /styles-DK6ATAUY.css HTTP/1.1" 304 -
+127.0.0.1 - - [07/Aug/2025 11:31:15] "GET /media/Prompt-ExtraBold-KGLTF7YY.ttf HTTP/1.1" 304 -
+127.0.0.1 - - [07/Aug/2025 11:31:16] "GET /media/Prompt-Bold-RKSCCBKZ.ttf HTTP/1.1" 304 -
