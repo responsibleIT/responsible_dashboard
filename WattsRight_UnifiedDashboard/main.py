@@ -15,7 +15,7 @@ fairness_path = resource_path("apps/fairness_dashboard/flask_ml/app.py")
 sustainability_path = resource_path("apps/sustainability_dashboard/backend/src/app.py")
 
 fairness_proc = subprocess.Popen(["python", fairness_path])
-sustainability_proc = subprocess.Popen(["python", sustainability_path])
+sustainability_proc = sustainability_proc = subprocess.Popen(["python", "-m", "apps.sustainability_dashboard.backend.src.app"])
 
 # Wait for servers to start up
 time.sleep(5)
