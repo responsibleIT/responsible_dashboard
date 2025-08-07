@@ -2,32 +2,29 @@ import subprocess
 import time
 import os
 import sys
+import webbrowser
 
 def resource_path(relative_path):
-    """ Get path to resource, works for dev and for PyInstaller """
-    if hasattr(sys, '_MEIPASS'):
+    """Get path to resource, for PyInstaller or dev"""
+    if hasattr(sys, "_MEIPASS"):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath("."), relative_path)
 
-# Resolve paths
-FAIRNESS_PATH = resource_path("apps/fairness_dashboard/flask_ml/app.py")
-SUSTAINABILITY_PATH = resource_path("apps/sustainability_dashboard/backend/src/app.py")
-FRONTPAGE_PATH = resource_path("frontpage/index.html")
+# Start both dashboard backends
+fairness_path = resource_path("apps/fairness_dashboard/flask_ml/app.py")
+sustainability_path = resource_path("apps/sustainability_dashboard/backend/src/app.py")
 
-# Start Flask and FastAPI
-fairness_proc = subprocess.Popen(["python", FAIRNESS_PATH])
-sustainability_proc = subprocess.Popen(["python", SUSTAINABILITY_PATH])
+fairness_proc = subprocess.Popen(["python", fairness_path])
+sustainability_proc = subprocess.Popen(["python", sustainability_path])
 
-# Wait for servers to start
+# Wait for servers to start up
 time.sleep(5)
 
-# Open frontpage in default browser (reliable in .exe)
-try:
-    os.startfile(FRONTPAGE_PATH)
-except Exception as e:
-    print("Failed to open frontpage:", e)
+# Open frontpage (not served over HTTP, just a file)
+frontpage_path = resource_path("frontpage/index.html")
+webbrowser.open(f"file://{frontpage_path}")
 
-# Wait for shutdown
+# Keep app running
 try:
     fairness_proc.wait()
     sustainability_proc.wait()

@@ -2,6 +2,3 @@ dist/
 build/
 *.exe
 *.pkg
-*.pyc
-__pycache__/
-node_modules/

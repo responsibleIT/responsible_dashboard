@@ -1,7 +1,6 @@
 import pandas as pd
 import json
 import os
-from fastapi import HTTPException
 
 from .utils.metrics import calculate_power_consumption, calculate_emissions
 
@@ -28,51 +27,40 @@ LOCATION_CARBON_MAPPING = {
     "germany": 329,
 }
 
+class BenchmarkDataError(Exception):
+    """Custom exception for benchmark data errors."""
+    def __init__(self, message, status_code=400):
+        super().__init__(message)
+        self.status_code = status_code
+
 def get_benchmark_from_csv(model: str, upload_id: str, target_threshold: float, gpu: str, location: str):
-    """
-    Generate benchmark data from CSV for a specific threshold.
-    
-    Args:
-        upload_id: The upload directory ID
-        target_threshold: The pruning threshold to get data for
-        gpu: GPU type for power calculations
-        location: Location for carbon intensity calculations
-    
-    Returns:
-        Dict in the same format as the original benchmark endpoint
-    """
     upload_path = os.path.join(UPLOAD_DIR, upload_id)
-    csv_path = os.path.join(upload_path, "threshold_data.csv")  # Adjust filename as needed
-    
+    csv_path = os.path.join(upload_path, "threshold_data.csv")
+
     if not os.path.exists(csv_path):
-        raise HTTPException(status_code=404, detail="Threshold data CSV not found")
-    
-    # Load CSV data
+        raise BenchmarkDataError("Threshold data CSV not found", 404)
+
     df = pd.read_csv(csv_path)
-    
-    # Get baseline data (threshold 0)
+
     baseline_row = df[df['threshold'] == 0]
     if baseline_row.empty:
-        raise HTTPException(status_code=404, detail="Baseline data (threshold 0) not found in CSV")
+        raise BenchmarkDataError("Baseline data (threshold 0) not found in CSV", 404)
     baseline = baseline_row.iloc[0]
-    
-    # Get target threshold data
+
     target_row = df[df['threshold'] == target_threshold]
     if target_row.empty:
-        raise HTTPException(status_code=404, detail=f"Data for threshold {target_threshold} not found in CSV")
+        raise BenchmarkDataError(f"Data for threshold {target_threshold} not found in CSV", 404)
     target = target_row.iloc[0]
-    
-    # Map GPU and get carbon intensity (assuming you have these mappings)
+
     gpu_mapped = GRAPHICSCARD_MAPPING.get(gpu)
     carbon_intensity = LOCATION_CARBON_MAPPING.get(location)
-    
+
     if not gpu_mapped:
-        raise HTTPException(status_code=400, detail=f"Unknown GPU: {gpu}")
+        raise BenchmarkDataError(f"Unknown GPU: {gpu}", 400)
     if carbon_intensity is None:
-        raise HTTPException(status_code=400, detail=f"Unknown location: {location}")
-    
-    # Build the response in the exact same format
-    benchmark_data = {
+        raise BenchmarkDataError(f"Unknown location: {location}", 400)
+
+    return {
         "model": model,
         "gpu": gpu,
         "location": location,
@@ -157,5 +145,3 @@ def get_benchmark_from_csv(model: str, upload_id: str, target_threshold: float, 
             }
         }
     }
-    
-    return benchmark_data
