@@ -2,7 +2,7 @@ import numpy as np
 from scipy.special import softmax
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, confusion_matrix
 
-from .preprocess import preprocess
+from preprocess import preprocess
 
 def evaluate_model(model, tokenizer, df):
     predictions = []

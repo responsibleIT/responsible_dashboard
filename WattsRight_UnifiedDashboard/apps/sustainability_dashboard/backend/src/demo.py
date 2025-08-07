@@ -2,7 +2,7 @@ import pandas as pd
 import json
 import os
 
-from .utils.metrics import calculate_power_consumption, calculate_emissions
+from utils.metrics import calculate_power_consumption, calculate_emissions
 
 UPLOAD_DIR = "uploads"
 GRAPHICSCARD_MAPPING = {

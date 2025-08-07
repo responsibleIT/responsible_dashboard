@@ -6,10 +6,10 @@ import pandas as pd
 from flask_socketio import emit, join_room, leave_room
 from dotenv import load_dotenv
 
-from .loading import load_huggingface_model, load_local_model
-from .preprocess import disable_low_weight_neurons
-from .benchmark import evaluate_model
-from .predict import predict_with_auto_regressive_model
+from loading import load_huggingface_model, load_local_model
+from preprocess import disable_low_weight_neurons
+from benchmark import evaluate_model
+from predict import predict_with_auto_regressive_model
 
 load_dotenv()
 

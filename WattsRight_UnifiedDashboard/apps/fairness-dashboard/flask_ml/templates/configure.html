@@ -4,28 +4,46 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configure Analysis - Fairness Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        @font-face {
+        font-family: prompt;
+        src: url(../static/fonts/prompt-extraBold.ttf) format("truetype");
+        font-weight: 800;
+      }
+
+      @font-face {
+        font-family: prompt;
+        src: url(../static/fonts/prompt.ttf) format("truetype");
+        font-weight: 400;
+      }
         /* --- Base & Variables --- */
         :root {
-            --primary-color: #007bff;
+            --watts-primary:#00E7B2;
+            --watts-primary-dark: #02bd91;
+            --watts-primary-alt: #16cfa4;
+            --watts-secondary:#0E1042;
+            --watts-secondary-light: #212579;
+            --watts-tertiary:#FDFDF6;
+            
+            --primary-color: var(--watts-secondary);
             --primary-light: #e7f3ff;
             --secondary-color: #6c757d;
-            --success-color: #198754;
+            --success-color: var(--watts-primary);
             --warning-color: #ffc107;
+            --info-color: var(--watts-secondary);
             --danger-color: #dc3545;
             --light-gray: #f8f9fa;
             --medium-gray: #dee2e6;
             --dark-gray: #6c757d;
             --text-color: #343a40;
-            --card-bg: #ffffff;
-            --body-bg: #f4f7f6;
+            --card-bg: var(--watts-tertiary);
+            --body-bg: var(--watts-primary);
             --border-radius: 8px;
             --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            --font-family-sans-serif: 'Inter', sans-serif;
+            --font-family: prompt, sans-serif;
         }
         body {
-            font-family: var(--font-family-sans-serif);
+            font-family: var(--font-family);
             line-height: 1.6;
             padding: 30px 20px;
             background-color: var(--body-bg);
@@ -39,9 +57,9 @@
              position: relative; /* Context for overlay */
              z-index: 1; /* Ensure form is below overlay when active */
         }
-        h1 { text-align: center; color: #333; margin-bottom: 15px; font-weight: 700; }
+        h1 { text-align: center; color: var(--watts-secondary); margin-bottom: 15px; font-weight: 700; }
         p.intro-text { text-align: center; color: var(--dark-gray); margin-bottom: 30px; font-size: 1.05rem; }
-        a { color: var(--primary-color); text-decoration: none; }
+        a { color: var(--primary-color); text-decoration: underline; }
         a:hover { text-decoration: underline; }
         hr { border: 0; border-top: 1px solid #eee; margin: 30px 0; }
 
@@ -70,7 +88,7 @@
             margin-bottom: 10px;
             font-weight: 600;
             font-size: 1.1rem;
-            color: #495057;
+            color: var(--watts-secondary);
         }
         select, input[type="text"], input[type="number"], input[type="file"], .checkbox-group, .radio-group {
             padding: 10px 12px;
@@ -164,9 +182,9 @@
 
         /* Button */
         .submit-button {
-            padding: 12px 25px; background: linear-gradient(to bottom, var(--success-color), #146c43); color: white; border: none; border-radius: var(--border-radius); cursor: pointer; font-size: 1.1rem; font-weight: 600; transition: background 0.3s ease, opacity 0.3s ease; width: 100%; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 12px 25px; background: linear-gradient(to bottom, var(--success-color), var(--watts-primary-dark)); color: var(--watts-secondary); border: none; border-radius: var(--border-radius); cursor: pointer; font-size: 1.1rem; font-weight: 600; transition: background 0.3s ease, opacity 0.3s ease; width: 100%; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-family: inherit;
         }
-        .submit-button:hover { background: linear-gradient(to bottom, #146c43, #0f5132); }
+        .submit-button:hover { background: linear-gradient(to bottom, var(--watts-primary-dark), #02a57f); }
         /* Style for button when loading */
         .submit-button.loading {
             opacity: 0.7;

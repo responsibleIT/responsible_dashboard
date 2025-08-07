@@ -1,15 +1,25 @@
 import os
+import sys
+
+# Ensure that src is in the Python path for relative imports
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(CURRENT_DIR)
+
 import time
 import random
 import json
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO
-from .websocket import websocket_handlers
+from websocket import websocket_handlers
 from werkzeug.utils import secure_filename
 
-from .utils.metrics import calculate_power_consumption, calculate_emissions
-from .demo import BenchmarkDataError, get_benchmark_from_csv
+from utils.metrics import calculate_power_consumption, calculate_emissions
+from demo import BenchmarkDataError, get_benchmark_from_csv
+
+# Ensure that src is in the Python path for relative imports
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(CURRENT_DIR)
 
 DEMO_MODE = os.getenv("DEMO", "false").lower() == "true"
 UPLOAD_DIR = "uploads"
@@ -181,3 +191,4 @@ def get_benchmark_data(upload_id):
 # If you want help porting that as well, let me know.
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=8000, threaded=True)
+    print("✅ Sustainability dashboard is now running on port 8000")

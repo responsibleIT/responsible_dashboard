@@ -3,28 +3,43 @@ import time
 import os
 import sys
 import webbrowser
+import socket
 
-def resource_path(relative_path):
-    """Get path to resource, for PyInstaller or dev"""
-    if hasattr(sys, "_MEIPASS"):
-        return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
+def is_port_open(port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) == 0
 
-# Start both dashboard backends
-fairness_path = resource_path("apps/fairness_dashboard/flask_ml/app.py")
-sustainability_path = resource_path("apps/sustainability_dashboard/backend/src/app.py")
+def wait_for_server(port, timeout=15):
+    for _ in range(timeout * 2):
+        if is_port_open(port):
+            return True
+        time.sleep(0.5)
+    return False
 
-fairness_proc = subprocess.Popen(["python", fairness_path], stdout=open("fairness.log", "w"), stderr=subprocess.STDOUT)
-sustainability_proc = subprocess.Popen(["python", "-m", "apps.sustainability_dashboard.backend.src.app"], stdout=open("sustainability.log", "w"), stderr=subprocess.STDOUT)
+def run_server(script_path, cwd=None):
+    return subprocess.Popen([sys.executable, script_path], cwd=cwd)
 
-# Wait for servers to start up
-time.sleep(5)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Open frontpage (not served over HTTP, just a file)
-frontpage_path = resource_path("frontpage/index.html")
-webbrowser.open(f"file://{frontpage_path}")
+# Fixed: correct path for fairness dashboard
+fairness_path = os.path.join(BASE_DIR, "apps", "fairness-dashboard", "flask_ml", "app.py")
 
-# Keep app running
+# Fixed: correct cwd for sustainability dashboard to resolve imports
+sustainability_src = os.path.join(BASE_DIR, "apps", "sustainability_dashboard", "backend", "src")
+print("Launching sustainability from:", sustainability_src)
+sustainability_path = os.path.join(sustainability_src, "app.py")
+
+# Start servers
+fairness_proc = run_server(fairness_path)
+sustainability_proc = run_server(sustainability_path, cwd=sustainability_src)
+
+# Open frontpage when both ports are live
+if wait_for_server(5000) and wait_for_server(8000):
+    frontpage = os.path.join(BASE_DIR, "frontpage", "index.html")
+    webbrowser.open(f"file://{frontpage}")
+else:
+    print("One or both servers failed to start.")
+
 try:
     fairness_proc.wait()
     sustainability_proc.wait()
