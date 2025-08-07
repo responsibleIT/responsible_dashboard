@@ -4,27 +4,45 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Onboarding - Step {{ step }}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        @font-face {
+        font-family: prompt;
+        src: url(../static/fonts/prompt-extraBold.ttf) format("truetype");
+        font-weight: 800;
+      }
+
+      @font-face {
+        font-family: prompt;
+        src: url(../static/fonts/prompt.ttf) format("truetype");
+        font-weight: 400;
+      }
         /* --- Base & Variables (Should match results.html) --- */
         :root {
-            --primary-color: #007bff;
+            --watts-primary:#00E7B2;
+            --watts-primary-dark: #02bd91;
+            --watts-primary-alt: #16cfa4;
+            --watts-secondary:#0E1042;
+            --watts-secondary-light: #212579;
+            --watts-tertiary:#FDFDF6;
+            
+            --primary-color: var(--watts-secondary);
             --primary-light: #e7f3ff;
             --secondary-color: #6c757d;
-            --success-color: #198754;
+            --success-color: var(--watts-primary);
             --warning-color: #ffc107;
+            --info-color: var(--watts-secondary);
             --danger-color: #dc3545;
             --light-gray: #f8f9fa;
             --medium-gray: #dee2e6;
             --dark-gray: #6c757d;
             --text-color: #343a40;
-            --card-bg: #ffffff;
-            --body-bg: #f4f7f6;
+            --card-bg: var(--watts-tertiary);
+            --body-bg: var(--watts-primary);
             --border-radius: 8px;
             --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            --font-family-sans-serif: 'Inter', sans-serif;
+            --font-family: prompt, sans-serif;
         }
-        body { font-family: var(--font-family-sans-serif); line-height: 1.6; padding: 20px; background-color: var(--body-bg); color: var(--text-color); margin: 0; }
+        body { font-family: var(--font-family); line-height: 1.6; padding: 20px; background-color: var(--body-bg); color: var(--text-color); margin: 0; }
         .container { max-width: 900px; margin: 30px auto; background-color: var(--card-bg); padding: 30px 40px; border-radius: var(--border-radius); box-shadow: var(--box-shadow); }
         h1, h2 { text-align: center; margin-bottom: 25px; color: var(--primary-color); font-weight: 700;}
         h2 { font-size: 1.5rem; margin-bottom: 15px; color: #444;}
@@ -39,11 +57,11 @@
         .onboarding-nav { margin-top: 30px; display: flex; justify-content: space-between; border-top: 1px solid #eee; padding-top: 20px; }
         .nav-button { padding: 10px 20px; border: none; border-radius: var(--border-radius); cursor: pointer; font-size: 1rem; font-weight: 600; text-decoration: none; display: inline-block; transition: background-color 0.3s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .nav-button.next { background-color: var(--primary-color); color: white; }
-        .nav-button.next:hover { background-color: #0056b3; }
+        .nav-button.next:hover { background-color: var(--watts-secondary-light); }
         .nav-button.back { background-color: var(--secondary-color); color: white; }
         .nav-button.back:hover { background-color: #5a6268; }
-        .nav-button.finish { background-color: var(--success-color); color: white; }
-        .nav-button.finish:hover { background-color: #146c43; }
+        .nav-button.finish { background-color: var(--success-color); color: var(--watts-secondary); }
+        .nav-button.finish:hover { background-color: var(--watts-primary-alt); }
         .nav-button:disabled { background-color: #e9ecef; color: #6c757d; cursor: not-allowed; }
 
         /* Highlighting sections */
