@@ -39,18 +39,36 @@ LOCATION_CARBON_MAPPING = {
 
 PERFORMANCE_METRICS = ["accuracy"]
 
-app = Flask(
-    __name__,
-    static_folder='../../frontend_v2/dist/browser',
-    static_url_path=''
-)
+def _bundle_path(rel):
+    """Resolve path both in dev and when frozen by PyInstaller."""
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.abspath(os.path.join(base, rel))
+
+# Absolute path to the Angular build directory
+STATIC_DIR = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), '..', '..', 'frontend_v2', 'dist', 'browser'
+))
+
+# If running from the EXE, also try resolving via _MEIPASS
+if not os.path.exists(os.path.join(STATIC_DIR, "index.html")):
+    alt = _bundle_path(os.path.join('apps', 'sustainability_dashboard',
+                                    'frontend_v2', 'dist', 'browser'))
+    if os.path.exists(os.path.join(alt, "index.html")):
+        STATIC_DIR = alt
+
+app = Flask(__name__, static_folder=STATIC_DIR, static_url_path='')
+
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 websocket_handlers(socketio)
 
 @app.route("/")
 def serve_frontend():
-    return send_from_directory(app.static_folder, "index.html")
+    idx = os.path.join(app.static_folder, "index.html")
+    if os.path.exists(idx):
+        return send_from_directory(app.static_folder, "index.html")
+    return ("Frontend not bundled (index.html missing). "
+            "Check PyInstaller datas for frontend_v2/dist/browser."), 500
 
 @app.route("/upload", methods=["POST"])
 def upload_data_test():
@@ -191,4 +209,4 @@ def get_benchmark_data(upload_id):
 # If you want help porting that as well, let me know.
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=8000, threaded=True)
-    print("✅ Sustainability dashboard is now running on port 8000")
+    print("Sustainability dashboard is now running on port 8000")

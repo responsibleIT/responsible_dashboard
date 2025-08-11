@@ -23,9 +23,16 @@ datas = [
     ('frontpage/index.html', 'frontpage'),
     ('frontpage/public', 'frontpage/public'),
     ('uploads', 'uploads'),
-    # Keep these as files for Flask
-    ('apps/fairness_dashboard/flask_ml', 'apps/fairness_dashboard/flask_ml'),
+
+    # Fairness app
+    ('apps/fairness_dashboard/flask_ml', 'apps/fairness_dashboard/flask_ml'),  # <-- adds .py and subfolders
+
+    # Sustainability backend
     ('apps/sustainability_dashboard/backend/src', 'apps/sustainability_dashboard/backend/src'),
+
+    # Sustainability frontend
+    ('apps/sustainability_dashboard/frontend_v2/dist/browser',
+     'apps/sustainability_dashboard/frontend_v2/dist/browser'),
 ]
 binaries = []
 hiddenimports = []
