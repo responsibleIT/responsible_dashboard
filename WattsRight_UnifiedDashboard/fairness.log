@@ -1,0 +1,16 @@
+2025-08-07 14:51:30,212 - INFO - Starting Flask application server...
+ * Serving Flask app 'app'
+ * Debug mode: on
+2025-08-07 14:51:30,229 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.2.10:5000
+2025-08-07 14:51:30,229 - INFO - [33mPress CTRL+C to quit[0m
+2025-08-07 14:51:30,230 - INFO -  * Restarting with stat
+2025-08-07 14:51:31,335 - INFO - Starting Flask application server...
+2025-08-07 14:51:31,344 - WARNING -  * Debugger is active!
+2025-08-07 14:51:31,347 - INFO -  * Debugger PIN: 124-269-535
+2025-08-07 14:51:39,514 - INFO - 127.0.0.1 - - [07/Aug/2025 14:51:39] "GET / HTTP/1.1" 200 -
+2025-08-07 14:51:39,770 - INFO - 127.0.0.1 - - [07/Aug/2025 14:51:39] "[36mGET /static/fonts/prompt-extraBold.ttf HTTP/1.1[0m" 304 -
+2025-08-07 14:51:39,773 - INFO - 127.0.0.1 - - [07/Aug/2025 14:51:39] "[36mGET /static/fonts/prompt.ttf HTTP/1.1[0m" 304 -
+2025-08-07 14:51:40,130 - INFO - 127.0.0.1 - - [07/Aug/2025 14:51:40] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
