@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.building.api import Splash
 from PyInstaller.utils.hooks import collect_all, copy_metadata
 
 block_cipher = None
@@ -24,16 +25,21 @@ datas = [
     ('frontpage/public', 'frontpage/public'),
     ('uploads', 'uploads'),
 
-    # Fairness app
-    ('apps/fairness_dashboard/flask_ml', 'apps/fairness_dashboard/flask_ml'),  # <-- adds .py and subfolders
+    # Fairness app (templates + static are needed at runtime)
+    ('apps/fairness_dashboard/flask_ml/templates', 'apps/fairness_dashboard/flask_ml/templates'),
+    ('apps/fairness_dashboard/flask_ml', 'apps/fairness_dashboard/flask_ml'),
 
-    # Sustainability backend
+    # Sustainability backend (Flask code + helpers)
     ('apps/sustainability_dashboard/backend/src', 'apps/sustainability_dashboard/backend/src'),
 
-    # Sustainability frontend
+    # Sustainability frontend build (Angular)
     ('apps/sustainability_dashboard/frontend_v2/dist/browser',
      'apps/sustainability_dashboard/frontend_v2/dist/browser'),
+
+    # Splash image
+    ('splashscreen.png', '.'),
 ]
+
 binaries = []
 hiddenimports = []
 
@@ -44,7 +50,7 @@ for pkg in MODULE_PKGS:
     binaries += b
     hiddenimports += h
 
-# Copy metadata (don’t fail if something lacks metadata)
+# Copy package metadata (best-effort)
 for distname in META_PKGS:
     try:
         datas += copy_metadata(distname)
@@ -68,13 +74,12 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
     pyz,
-    a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
+    a.scripts, a.binaries, a.zipfiles, a.datas,
     name='main',
     debug=False,
     strip=False,
     upx=True,
-    console=True,   # keep True during testing
+    console=True,
+    splash='splashscreen.png',
 )
+

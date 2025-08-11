@@ -1,58 +1,91 @@
 import os
 import sys
 import time
-import runpy
-import socket
 import webbrowser
+import socket
 import subprocess
 import tempfile
 from pathlib import Path
 
-# ---------------- Utilities ----------------
+# --- make console tolerant to unicode when running as .exe ---
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
-def safe_print(*args, **kwargs):
-    """Print using a safe encoding (no emoji)."""
-    text = " ".join(str(a) for a in args)
+# --- Optional PyInstaller splash: present only inside the bundled .exe ---
+# --- Optional PyInstaller splash (safe import) ---
+def _get_pyi_splash():
     try:
-        # write directly to stdout with replacement; works in cp1252 consoles
-        sys.stdout.write(text + "\n")
-        sys.stdout.flush()
+        import os
+        # Only import if bootloader actually created the splash
+        if os.environ.get("_PYI_SPLASH") or os.environ.get("_PYI_SPLASH_IPC"):
+            import pyi_splash  # provided by PyInstaller at runtime
+            return pyi_splash
     except Exception:
-        # fall back to ascii-only
-        sys.stdout.write(text.encode("ascii", "ignore").decode("ascii") + "\n")
-        sys.stdout.flush()
+        pass
+    return None
 
+pyi_splash = _get_pyi_splash()
+
+def splash_update(msg: str):
+    if pyi_splash:
+        try:
+            pyi_splash.update_text(msg)
+        except Exception:
+            pass
+
+try:
+    import tkinter  # forces PyInstaller to collect Tk/Tcl for the splash
+except Exception:
+    pass
+
+# -------- Utilities --------
 def resource_path(rel_path: str) -> str:
-    """Return absolute path to a resource whether running from source or PyInstaller one-file."""
+    """Absolute path to a resource whether running from source or PyInstaller one-file."""
     base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
     return str((base / rel_path).resolve())
+
 
 def is_port_open(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(0.3)
         return s.connect_ex(("127.0.0.1", port)) == 0
 
-def wait_for_server(port: int, name: str, timeout: int = 40) -> bool:
-    safe_print(f"Waiting for {name} on port {port} (timeout {timeout}s)...")
+
+def wait_for_server(port: int, name: str, timeout: int = 30) -> bool:
+    print(f"Waiting for {name} on port {port} (timeout {timeout}s)...", flush=True)
     deadline = time.time() + timeout
     while time.time() < deadline:
         if is_port_open(port):
-            safe_print(f"{name} is up on port {port}.")
+            print(f"{name} is up on port {port}.", flush=True)
             return True
         time.sleep(0.5)
-        sys.stdout.write(".")
-        sys.stdout.flush()
-    sys.stdout.write("\n")
-    safe_print(f"Timed out waiting for {name} on port {port}.")
+        print(".", end="", flush=True)
+    print("")  # newline
+    print(f"Timed out waiting for {name} on port {port}.", flush=True)
     return False
 
-def log_file(name: str) -> Path:
-    d = Path(tempfile.gettempdir()) / "wattsright_logs"
-    d.mkdir(parents=True, exist_ok=True)
-    return d / f"{name}.log"
 
-# ------------- Paths inside/beside bundle -------------
+def run_server(script_path: str, cwd: str | None, log_name: str) -> subprocess.Popen:
+    """Start a Python script as a subprocess, logging stdout/stderr to a temp file."""
+    log_dir = Path(tempfile.gettempdir()) / "wattsright_logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / f"{log_name}.log"
+    print(f"Logging {log_name} to: {log_file}", flush=True)
+    f = open(log_file, "w", buffering=1, encoding="utf-8", errors="replace")
+    return subprocess.Popen(
+        [sys.executable, script_path],
+        cwd=cwd,
+        stdout=f,
+        stderr=subprocess.STDOUT,
+        env=os.environ.copy(),
+        creationflags=0,  # keep visible console for debugging
+    )
 
+
+# -------- Resolve paths inside/beside the bundle --------
 FAIRNESS_SCRIPT = resource_path("apps/fairness_dashboard/flask_ml/app.py")
 
 SUSTAINABILITY_DIR = resource_path("apps/sustainability_dashboard/backend/src")
@@ -60,102 +93,79 @@ SUSTAINABILITY_SCRIPT = str(Path(SUSTAINABILITY_DIR) / "app.py")
 
 FRONTPAGE_HTML = resource_path("frontpage/index.html")
 
-# ---------------- Child runners ----------------
+print("Resolved paths:", flush=True)
+print(f"  Fairness script:        {FAIRNESS_SCRIPT}", flush=True)
+print(f"  Sustainability script:  {SUSTAINABILITY_SCRIPT}", flush=True)
+print(f"  Sustainability cwd:     {SUSTAINABILITY_DIR}", flush=True)
+print(f"  Frontpage:              {FRONTPAGE_HTML}", flush=True)
 
-def run_child(script_path: str, cwd: str) -> None:
-    """
-    Run a target script in this frozen interpreter (child mode).
-    This avoids needing an external python.exe.
-    """
-    os.chdir(cwd)
-    # Ensure the target directory is importable
-    if cwd not in sys.path:
-        sys.path.insert(0, cwd)
-    # Make printing safer in child too
-    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+# Sanity checks
+missing = []
+if not Path(FAIRNESS_SCRIPT).is_file():
+    missing.append(FAIRNESS_SCRIPT)
+if not Path(SUSTAINABILITY_SCRIPT).is_file():
+    missing.append(SUSTAINABILITY_SCRIPT)
+if not Path(FRONTPAGE_HTML).is_file():
+    missing.append(FRONTPAGE_HTML)
 
-    # Hand control to the target app.py as if it were run directly.
-    # This will block until that script exits.
-    runpy.run_path(script_path, run_name="__main__")
+if missing:
+    print("Missing required files in the bundle:")
+    for m in missing:
+        print("  -", m)
+    print("Check your .spec datas section.")
+    sys.exit(1)
 
-# ---------------- Entry point ----------------
+# -------- Start servers --------
+print("Launching servers...", flush=True)
+fairness_proc = run_server(
+    FAIRNESS_SCRIPT,
+    cwd=str(Path(FAIRNESS_SCRIPT).parent),
+    log_name="fairness",
+)
+sustainability_proc = run_server(
+    SUSTAINABILITY_SCRIPT,
+    cwd=SUSTAINABILITY_DIR,
+    log_name="sustainability",
+)
 
-def main():
-    # Child mode?
-    if any(a.startswith("--child=") for a in sys.argv[1:]):
-        # --child=fairness or --child=sustainability
-        child = next(a.split("=", 1)[1] for a in sys.argv[1:] if a.startswith("--child="))
-        if child == "fairness":
-            run_child(FAIRNESS_SCRIPT, Path(FAIRNESS_SCRIPT).parent.as_posix())
-        elif child == "sustainability":
-            run_child(SUSTAINABILITY_SCRIPT, SUSTAINABILITY_DIR)
-        else:
-            safe_print(f"Unknown child target: {child}")
-            sys.exit(2)
-        return
+# -------- Wait for ports and open frontpage --------
+# show some progress on the splash while we wait
+def splash_update(msg: str):
+    if pyi_splash:
+        try:
+            pyi_splash.update_text(msg)
+        except Exception:
+            pass
 
-    # Parent launcher
-    safe_print('Resolved paths:')
-    safe_print('  Fairness script:       ', FAIRNESS_SCRIPT)
-    safe_print('  Sustainability script: ', SUSTAINABILITY_SCRIPT)
-    safe_print('  Sustainability cwd:    ', SUSTAINABILITY_DIR)
-    safe_print('  Frontpage:             ', FRONTPAGE_HTML)
+splash_update("Starting services...")
+ok1 = wait_for_server(5000, "Fairness dashboard", timeout=40)
+splash_update("Fairness ready. Starting sustainability...")
+ok2 = wait_for_server(8000, "Sustainability dashboard", timeout=40)
 
-    missing = []
-    if not Path(FAIRNESS_SCRIPT).is_file():        missing.append(FAIRNESS_SCRIPT)
-    if not Path(SUSTAINABILITY_SCRIPT).is_file():  missing.append(SUSTAINABILITY_SCRIPT)
-    if not Path(FRONTPAGE_HTML).is_file():         missing.append(FRONTPAGE_HTML)
+if ok1 and ok2:
+    splash_update("Opening frontpage...")
+    print("Opening frontpage...", flush=True)
+    webbrowser.open(f"file:///{FRONTPAGE_HTML}")
+    # hide the splash as soon as we’ve kicked the browser
+    if pyi_splash:
+        try:
+            pyi_splash.close()
+        except Exception:
+            pass
+else:
+    print("One or both servers failed to start. See logs in %TEMP%/wattsright_logs.", flush=True)
+    # make sure the splash doesn’t hang around forever on error
+    if pyi_splash:
+        try:
+            pyi_splash.close()
+        except Exception:
+            pass
 
-    if missing:
-        safe_print("Missing required files in the bundle:")
-        for m in missing:
-            safe_print("  -", m)
-        safe_print("Check your .spec datas section.")
-        sys.exit(1)
-
-    safe_print("Launching servers...")
-
-    # Spawn two new instances of THIS exe, each in child mode.
-    this_exe = sys.argv[0]  # path to the frozen exe (or to main.py in dev)
-
-    fair_log = log_file("fairness")
-    sus_log  = log_file("sustainability")
-
-    fair_out = open(fair_log, "w", buffering=1, encoding="utf-8", errors="replace")
-    sus_out  = open(sus_log,  "w", buffering=1, encoding="utf-8", errors="replace")
-
-    safe_print("Logging fairness to:     ", fair_log)
-    safe_print("Logging sustainability to:", sus_log)
-
-    fairness_proc = subprocess.Popen(
-        [this_exe, "--child=fairness"],
-        stdout=fair_out,
-        stderr=subprocess.STDOUT,
-        env=os.environ.copy()
-    )
-    sustainability_proc = subprocess.Popen(
-        [this_exe, "--child=sustainability"],
-        stdout=sus_out,
-        stderr=subprocess.STDOUT,
-        env=os.environ.copy()
-    )
-
-    ok1 = wait_for_server(5000, "Fairness dashboard", timeout=40)
-    ok2 = wait_for_server(8000, "Sustainability dashboard", timeout=40)
-
-    if ok1 and ok2:
-        safe_print("Opening frontpage...")
-        webbrowser.open(f"file:///{FRONTPAGE_HTML}")
-    else:
-        safe_print("One or both servers failed to start. See logs in %TEMP%/wattsright_logs.")
-
-    try:
-        fairness_proc.wait()
-        sustainability_proc.wait()
-    except KeyboardInterrupt:
-        safe_print("KeyboardInterrupt: terminating children...")
-        fairness_proc.terminate()
-        sustainability_proc.terminate()
-
-if __name__ == "__main__":
-    main()
+# -------- Keep parent alive; clean exit on Ctrl+C --------
+try:
+    fairness_proc.wait()
+    sustainability_proc.wait()
+except KeyboardInterrupt:
+    print("\nKeyboardInterrupt: terminating children...", flush=True)
+    fairness_proc.terminate()
+    sustainability_proc.terminate()
