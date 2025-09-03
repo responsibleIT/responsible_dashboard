@@ -4,35 +4,42 @@ from PyInstaller.utils.hooks import collect_all, copy_metadata
 
 block_cipher = None
 
-# 1) Modules to collect (import names)
+# 1) Top-level Python packages we want fully collected
 MODULE_PKGS = [
     "pandas", "numpy", "scipy", "sklearn", "joblib",
     "flask", "flask_cors", "flask_socketio", "werkzeug",
     "jinja2", "itsdangerous", "click", "markupsafe",
     "psutil", "engineio", "socketio",
+    "setuptools",  # <-- important to satisfy pyi_rth_setuptools
 ]
 
-# 2) Distributions to copy metadata for (pip project names)
+# 2) Distributions to copy metadata for (pip names)
 META_PKGS = [
     "pandas", "numpy", "scipy", "scikit-learn", "joblib",
     "Flask", "Flask-Cors", "Flask-SocketIO", "Werkzeug",
     "Jinja2", "itsdangerous", "click", "MarkupSafe",
     "psutil", "python-engineio", "python-socketio",
+    "setuptools",
 ]
 
 datas = [
+    # Frontpage
     ('frontpage/index.html', 'frontpage'),
     ('frontpage/public', 'frontpage/public'),
+
+    # Ensure uploads dir exists at runtime
     ('uploads', 'uploads'),
 
-    # Fairness app (templates + static are needed at runtime)
-    ('apps/fairness_dashboard/flask_ml/templates', 'apps/fairness_dashboard/flask_ml/templates'),
+    # ===== Fairness dashboard =====
+    # Entire folder (templates/static/etc.)
     ('apps/fairness_dashboard/flask_ml', 'apps/fairness_dashboard/flask_ml'),
+    # Explicitly add app.py so our runtime path check can never miss it
+    ('apps/fairness_dashboard/flask_ml/app.py', 'apps/fairness_dashboard/flask_ml'),
 
-    # Sustainability backend (Flask code + helpers)
+    # ===== Sustainability backend =====
     ('apps/sustainability_dashboard/backend/src', 'apps/sustainability_dashboard/backend/src'),
 
-    # Sustainability frontend build (Angular)
+    # ===== Sustainability frontend (Angular build) =====
     ('apps/sustainability_dashboard/frontend_v2/dist/browser',
      'apps/sustainability_dashboard/frontend_v2/dist/browser'),
 
@@ -43,14 +50,16 @@ datas = [
 binaries = []
 hiddenimports = []
 
-# Pull package contents
+# Pull full package contents
 for pkg in MODULE_PKGS:
     d, b, h = collect_all(pkg)
     datas += d
     binaries += b
     hiddenimports += h
 
-# Copy package metadata (best-effort)
+hiddenimports += ["select"]
+
+# Metadata (best effort)
 for distname in META_PKGS:
     try:
         datas += copy_metadata(distname)
@@ -66,7 +75,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['pytest', 'distutils.tests', 'email.tests'],
     noarchive=False,
 )
 
@@ -79,7 +88,6 @@ exe = EXE(
     debug=False,
     strip=False,
     upx=True,
-    console=True,
-    splash='splashscreen.png',
+    console=True,                 # keep True while testing
+    splash='splashscreen.png',    # PyInstaller splash
 )
-
