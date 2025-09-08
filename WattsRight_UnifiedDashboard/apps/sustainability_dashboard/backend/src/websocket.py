@@ -11,15 +11,26 @@ from preprocess import disable_low_weight_neurons
 from benchmark import evaluate_model
 from predict import predict_with_auto_regressive_model
 
+import glob
+
 load_dotenv()
 
-DEMO_MODE = os.getenv("DEMO", "false").lower() == "true"
+DEMO_MODE = "false" #os.getenv("DEMO", "false").lower() == "true"
 UPLOAD_DIR = "uploads"
 THRESHOLDS = [i * 0.1 for i in range(1, 100)]
 LABEL_MAPPING = {0: 'Ham', 1: 'Spam'}
 
 
 # --- Helper Functions ---
+def find_local_model(upload_id: str) -> str | None:
+    """Return the first local model file path (.h5 or .keras) in this upload, if any."""
+    base = get_upload_path(upload_id)
+    for ext in (".h5", ".keras"):
+        matches = glob.glob(os.path.join(base, f"*{ext}"))
+        if matches:
+            return matches[0]
+    return None
+
 def get_upload_path(upload_id):
     return os.path.join(UPLOAD_DIR, upload_id)
 
@@ -137,34 +148,63 @@ def websocket_handlers(socketio):
         upload_id = data.get("upload_id")
 
         async def process():
-            emit("status", {"message": "Model is being loaded..."}, to=upload_id)
+            try:
+                emit("status", {"message": "Model is being loaded..."}, to=upload_id)
 
-            df = load_dataset(upload_id)
-            huggingface_url = get_huggingface_url(upload_id)
-            model, tokenizer = load_huggingface_model(huggingface_url)
-            model_copy = copy.deepcopy(model)
-            pruned_model, model_info = disable_low_weight_neurons(model_copy, 10)
+                # Load dataset (expects uploads/<id>/dataset.csv)
+                df = load_dataset(upload_id)
 
-            emit("status", {"message": "Benchmarking model..."}, to=upload_id)
-            baseline = evaluate_model(model, tokenizer, df)
-            pruned = evaluate_model(pruned_model, tokenizer, df)
+                # Decide model source: Hugging Face URL first, else local model file
+                huggingface_url = get_huggingface_url(upload_id)
+                local_model_path = find_local_model(upload_id)
 
-            emit("status", {"message": "Collecting pruning data..."}, to=upload_id)
-            pruned_data = {
-                0: create_baseline_metrics(baseline, model_info, 0),
-                10: create_baseline_metrics(pruned, model_info, 10)
-            }
+                if huggingface_url:
+                    model, tokenizer = load_huggingface_model(huggingface_url)
+                    model_name_for_logs = huggingface_url
+                elif local_model_path:
+                    model, tokenizer = load_local_model(local_model_path)
+                    model_name_for_logs = os.path.basename(local_model_path)
+                else:
+                    emit("status", {
+                        "type": "error",
+                        "message": "No model provided. Enter a Hugging Face repo or upload a .h5/.keras file."
+                    }, to=upload_id)
+                    return
 
-            for threshold in THRESHOLDS:
-                threshold = round(threshold, 1)
+                # Prune a copy at 10% for the initial pair of baselines
                 model_copy = copy.deepcopy(model)
-                pruned_model, metrics = disable_low_weight_neurons(model_copy, threshold)
-                pruned_data[threshold] = create_threshold_data_entry(metrics, threshold)
+                pruned_model, model_info = disable_low_weight_neurons(model_copy, 10)
 
-            emit("status", {"message": "Predicting performance..."}, to=upload_id)
-            pruned_data = predict_with_auto_regressive_model(pruned_data, "accuracy")
-            save_json_file(upload_id, "pruned_threshold_data.json", pruned_data)
-            emit("status", {"message": "Benchmark completed successfully", "type": "complete"}, to=upload_id)
+                emit("status", {"message": "Benchmarking model..."}, to=upload_id)
+                baseline = evaluate_model(model, tokenizer, df)
+                pruned = evaluate_model(pruned_model, tokenizer, df)
+
+                emit("status", {"message": "Collecting pruning data..."}, to=upload_id)
+                pruned_data = {
+                    0: create_baseline_metrics(baseline, model_info, 0),
+                    10: create_baseline_metrics(pruned, model_info, 10)
+                }
+
+                # Sweep thresholds (0.1 .. 9.9 as defined in THRESHOLDS)
+                for t in THRESHOLDS:
+                    t = round(t, 1)
+                    m_copy = copy.deepcopy(model)
+                    p_model, metrics = disable_low_weight_neurons(m_copy, t)
+                    pruned_data[t] = create_threshold_data_entry(metrics, t)
+
+                emit("status", {"message": "Predicting performance..."}, to=upload_id)
+                pruned_data = predict_with_auto_regressive_model(pruned_data, "accuracy")
+
+                # Persist for the validate step
+                save_json_file(upload_id, "pruned_threshold_data.json", pruned_data)
+
+                emit("status", {
+                    "message": f"Benchmark completed successfully for {model_name_for_logs}",
+                    "type": "complete"
+                }, to=upload_id)
+
+            except Exception as e:
+                emit("status", {"type": "error", "message": f"Start failed: {e}"}, to=upload_id)
 
         socketio.start_background_task(process)
 
@@ -176,19 +216,53 @@ def websocket_handlers(socketio):
         location = data.get("location")
 
         async def process():
-            emit("status", {"message": "Model is being loaded..."}, to=upload_id)
+            try:
+                emit("status", {"message": "Model is being loaded..."}, to=upload_id)
 
-            df = load_dataset(upload_id)
-            huggingface_url = get_huggingface_url(upload_id)
-            model, tokenizer = load_huggingface_model(huggingface_url)
-            pruned_model, model_info = disable_low_weight_neurons(model, threshold)
+                # Load dataset
+                df = load_dataset(upload_id)
 
-            emit("status", {"message": "Benchmarking model..."}, to=upload_id)
-            benchmark = evaluate_model(pruned_model, tokenizer, df)
-            pruned_data = load_json_file(upload_id, "pruned_threshold_data.json")
+                # Decide model source again (same rule as in start)
+                huggingface_url = get_huggingface_url(upload_id)
+                local_model_path = find_local_model(upload_id)
 
-            benchmark_data = create_benchmark_data(huggingface_url, threshold, gpu, location, benchmark, model_info, pruned_data)
-            save_json_file(upload_id, "benchmark_data.json", benchmark_data)
-            emit("status", {"message": "Validation completed successfully", "type": "complete"}, to=upload_id)
+                if huggingface_url:
+                    model, tokenizer = load_huggingface_model(huggingface_url)
+                    model_id_for_benchmark = huggingface_url
+                elif local_model_path:
+                    model, tokenizer = load_local_model(local_model_path)
+                    model_id_for_benchmark = os.path.basename(local_model_path)
+                else:
+                    emit("status", {
+                        "type": "error",
+                        "message": "No model available to validate. Run the start step with a HF URL or upload a model."
+                    }, to=upload_id)
+                    return
+
+                # Apply chosen threshold and evaluate
+                pruned_model, model_info = disable_low_weight_neurons(model, threshold)
+
+                emit("status", {"message": "Benchmarking model..."}, to=upload_id)
+                benchmark = evaluate_model(pruned_model, tokenizer, df)
+
+                # Load predictions from start step
+                pruned_data = load_json_file(upload_id, "pruned_threshold_data.json")
+
+                # Build and save full benchmark payload
+                benchmark_data = create_benchmark_data(
+                    model_id_for_benchmark, threshold, gpu, location,
+                    benchmark, model_info, pruned_data
+                )
+                save_json_file(upload_id, "benchmark_data.json", benchmark_data)
+
+                emit("status", {"message": "Validation completed successfully", "type": "complete"}, to=upload_id)
+
+            except FileNotFoundError as e:
+                emit("status", {
+                    "type": "error",
+                    "message": f"Missing file: {e}. Make sure dataset.csv exists and that you ran the start step."
+                }, to=upload_id)
+            except Exception as e:
+                emit("status", {"type": "error", "message": f"Validate failed: {e}"}, to=upload_id)
 
         socketio.start_background_task(process)

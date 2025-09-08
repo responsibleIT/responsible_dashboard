@@ -1,60 +1,110 @@
 <div class="upload-container" data-bs-backdrop="static">
   <h2>{{ 'What do you want to analyze?' | uppercase }}</h2>
-  <form class="upload-container__form" (ngSubmit)="submitForm()">
+
+  <form class="upload-container__form" (ngSubmit)="submitForm()" [formGroup]="uploadFormGroup">
 
     <div class="upload-container__form__section">
       <h2 class="upload-container__form__section__title">{{ 'Model Source' | uppercase }}</h2>
 
       <div class="upload-container__form__section__inputs model">
+        <!-- Hugging Face URL -->
         <app-form-input-text
           [label]="''"
           [placeholder]="'Enter the name of the HuggingFace model'"
           [control]="uploadFormGroup.controls.huggingfaceModel"
-          [required]="true"
-        />
+          [required]="false">
+        </app-form-input-text>
 
         <div class="or">
-          <hr>
-          <span>or</span>
+          <hr /><span>or</span>
         </div>
 
+        <!-- Local model file -->
         <div class="model-upload">
           <h2>{{ 'Upload model file' | uppercase }}</h2>
-
           <app-form-input-file
             [placeholder]="'Upload model'"
             [control]="uploadFormGroup.controls.h5Model"
-            [required]="true"
-          />
+            [required]="false">
+          </app-form-input-file>
+          <small>Accepted: .h5 / .keras</small>
         </div>
 
+        <!-- Either/Or validation messages -->
         <div class="error-message" *ngIf="neitherFieldFilledError">
-          Please provide either a Hugging Face URL or upload an H5 model.
+          Please provide either a Hugging Face URL or upload a model file.
         </div>
-
         <div class="error-message" *ngIf="bothFieldsFilledError">
-          Please provide either a Hugging Face URL or upload an H5 model, not both.
+          Provide either a Hugging Face URL or upload a model, not both.
         </div>
       </div>
     </div>
 
+    <!-- Dataset -->
     <div class="upload-container__form__section dataset-section">
       <h2>{{ 'Dataset (Required)' | uppercase }}</h2>
 
       <app-form-input-file
         [placeholder]="'Upload dataset'"
         [control]="uploadFormGroup.controls.dataset"
-        [required]="true"
-      />
+        [required]="true">
+      </app-form-input-file>
 
       <span>Used to measure the model's performance before and after optimization</span>
+    </div>
+
+    <!-- Column selection (shown when we’ve read the CSV header) -->
+    <div class="upload-container__form__section" *ngIf="csvColumns.length">
+      <h2>{{ 'Columns' | uppercase }}</h2>
+
+      <div class="grid">
+        <div class="field">
+          <label>Text column <span class="req">*</span></label>
+          <select [formControl]="uploadFormGroup.controls.textCol">
+            <option *ngFor="let c of csvColumns" [value]="c">{{ c }}</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Target/label column <span class="req">*</span></label>
+          <select [formControl]="uploadFormGroup.controls.targetCol">
+            <option *ngFor="let c of csvColumns" [value]="c">{{ c }}</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Optional settings from /settings -->
+    <div class="upload-container__form__section" *ngIf="gpus.length || locations.length || metrics.length">
+      <h2>{{ 'Settings' | uppercase }}</h2>
+      <div class="grid">
+        <div class="field" *ngIf="gpus.length">
+          <label>GPU</label>
+          <select [formControl]="uploadFormGroup.controls.gpu">
+            <option *ngFor="let g of gpus" [value]="g">{{ g }}</option>
+          </select>
+        </div>
+        <div class="field" *ngIf="locations.length">
+          <label>Location</label>
+          <select [formControl]="uploadFormGroup.controls.location">
+            <option *ngFor="let l of locations" [value]="l">{{ l | titlecase }}</option>
+          </select>
+        </div>
+        <div class="field" *ngIf="metrics.length">
+          <label>Metric</label>
+          <select [formControl]="uploadFormGroup.controls.metric">
+            <option *ngFor="let m of metrics" [value]="m">{{ m | titlecase }}</option>
+          </select>
+        </div>
+      </div>
     </div>
 
     <button
       type="submit"
       appButton
       [ecogreen]="true"
-      [disabled]="uploadFormGroup.invalid">Run analysis
+      [disabled]="!canSubmit()">
+      Run analysis
     </button>
   </form>
 </div>

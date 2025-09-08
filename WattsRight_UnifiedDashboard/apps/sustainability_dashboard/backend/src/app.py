@@ -21,7 +21,7 @@ from demo import BenchmarkDataError, get_benchmark_from_csv
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(CURRENT_DIR)
 
-DEMO_MODE = os.getenv("DEMO", "false").lower() == "true"
+DEMO_MODE = "false" #os.getenv("DEMO", "false").lower() == "true"
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -103,7 +103,7 @@ def upload_data_test():
         model.save(model_path)
 
     if dataset:
-        dataset_path = os.path.join(upload_path, secure_filename(dataset.filename))
+        dataset_path = os.path.join(upload_path, "dataset.csv")
         dataset.save(dataset_path)
 
     return jsonify({"upload_id": subdirectory})
