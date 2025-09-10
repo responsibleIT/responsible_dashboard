@@ -70,6 +70,28 @@ def serve_frontend():
     return ("Frontend not bundled (index.html missing). "
             "Check PyInstaller datas for frontend_v2/dist/browser."), 500
 
+@app.route("/save_columns", methods=["POST"])
+def save_columns():
+    data = request.get_json(force=True, silent=True) or {}
+    upload_id = data.get("upload_id")
+    target_column = data.get("target_column")
+
+    if not upload_id or not target_column:
+        return jsonify({"error": "upload_id and target_column are required"}), 400
+
+    upload_path = os.path.join(UPLOAD_DIR, upload_id)
+    os.makedirs(upload_path, exist_ok=True)
+
+    payload = {
+        # we only store target; keep text_column for future—set to None
+        "text_column": None,
+        "target_column": target_column
+    }
+    with open(os.path.join(upload_path, "selected_columns.json"), "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+
+    return jsonify({"ok": True})
+
 @app.route("/upload", methods=["POST"])
 def upload_data_test():
     if DEMO_MODE:
@@ -103,8 +125,18 @@ def upload_data_test():
         model.save(model_path)
 
     if dataset:
-        dataset_path = os.path.join(upload_path, "dataset.csv")
+        dataset_path = os.path.join(upload_path, secure_filename(dataset.filename))
         dataset.save(dataset_path)
+
+    # ✅ NEW: persist selected columns (target only)
+    selected = request.form.get("selected_columns")
+    if selected:
+        try:
+            sel_obj = json.loads(selected)
+            with open(os.path.join(upload_path, "selected_columns.json"), "w", encoding="utf-8") as f:
+                json.dump(sel_obj, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass  # ignore if malformed
 
     return jsonify({"upload_id": subdirectory})
 
@@ -208,5 +240,6 @@ def get_benchmark_data(upload_id):
 # Note: WebSocket route removed, Flask needs Flask-SocketIO for this.
 # If you want help porting that as well, let me know.
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=8000, threaded=True)
+    # IMPORTANT: run the socketio server, not Flask's dev server
+    socketio.run(app, debug=True, host="0.0.0.0", port=8000)
     print("Sustainability dashboard is now running on port 8000")

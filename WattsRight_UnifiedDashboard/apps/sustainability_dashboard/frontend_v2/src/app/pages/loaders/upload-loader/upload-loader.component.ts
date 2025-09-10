@@ -1,76 +1,97 @@
-import {Component, ElementRef, OnDestroy, OnInit, ViewChild} from '@angular/core';
-import {ButtonDirective} from '@app/domains/ui/directives/button/button.directive';
-import {Router} from '@angular/router';
-import {WebsocketService} from '@app/services/websocket.service';
-import {Subscription} from 'rxjs';
+// apps/sustainability_dashboard/frontend_v2/src/app/pages/loaders/upload-loader/upload-loader.component.ts
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
+import { Subscription, Observable, of } from 'rxjs';
+import { filter, take } from 'rxjs/operators';
+
+import { ButtonDirective } from '@app/domains/ui/directives/button/button.directive';
+import { WebsocketService } from '@app/services/websocket.service';
+import { UploadService } from '@app/services/upload.service';
+
+type ConnStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
+type WsMsg = { type?: string; message?: string; [k: string]: any };
 
 @Component({
   selector: 'app-upload-loader',
-  imports: [
-    ButtonDirective
-  ],
+  standalone: true,
+  imports: [ButtonDirective],
   templateUrl: './upload-loader.component.html',
-  styleUrl: './upload-loader.component.scss'
+  styleUrl: './upload-loader.component.scss',
 })
 export class UploadLoaderComponent implements OnInit, OnDestroy {
-
-  @ViewChild('progressCircle', {static: true}) progressCircle!: ElementRef;
-
-  public message: string = 'Uploading...';
-
-  private subscription: Subscription = new Subscription();
+  public message = 'Uploading…';
+  private sub = new Subscription();
 
   constructor(
     private readonly router: Router,
     private readonly websocketService: WebsocketService,
+    private readonly uploadService: UploadService
   ) {}
 
-  ngOnInit() {
-    this.websocketService.connect()
-    this.subscription.add(
-      this.websocketService.getConnectionStatus().subscribe(status => {
-        if (status === 'connected') {
-          this.websocketService.sendMessage({
-            type: 'start',
-            gpu: null,
-            location: null,
-          })
-        } else if (status === 'disconnected') {
-          console.log('WebSocket disconnected');
-        } else if (status === 'error') {
-          console.error('WebSocket error occurred');
-        }
-      })
-    )
-    this.subscription.add(
-      this.websocketService.getMessages().subscribe(message => {
-        if (message.type === 'complete') {
-          this.message = message.message;
-          this.websocketService.disconnect();
-          setTimeout(() => {
-            this.router.navigateByUrl('/pruning-adjustments', { replaceUrl: true });
-          }, 1000);
-        } else if (message.type === 'loading') {
-          this.message = message.message;
+  ngOnInit(): void {
+    const uploadId = this.uploadService.uploadIdValue;
+    if (!uploadId) {
+      // No context — return to start page
+      this.router.navigate(['/']);
+      return;
+    }
+
+    // 1) Open socket
+    this.websocketService.connect(uploadId);
+
+    // 2) Get a connection-status stream that works for either service shape
+    const connection$: Observable<ConnStatus> =
+      // newer public observable
+      (this.websocketService as any).connection$
+        ? (this.websocketService as any).connection$
+        // older service API method
+        : (this.websocketService as any).getConnectionStatus?.() ?? of('connecting');
+
+    // 3) When connected, fire the 'start' event
+    this.sub.add(
+      connection$
+        .pipe(
+          filter((s: ConnStatus) => s === 'connected'),
+          take(1)
+        )
+        .subscribe(() => {
+          // Support both send() and sendMessage()
+          const svc: any = this.websocketService;
+          if (typeof svc.send === 'function') {
+            svc.send('join',  { uploadId });
+            svc.send('start', { uploadId });
+          } else {
+            svc.sendMessage({ event: 'join',  data: { uploadId } });
+            svc.sendMessage({ event: 'start', data: { uploadId } });
+          }
+        })
+    );
+
+    // 4) Subscribe to backend progress/messages (supports both shapes)
+    const messages$: Observable<WsMsg> =
+      (this.websocketService as any).messages$
+        ? (this.websocketService as any).messages$
+        : (this.websocketService as any).getMessages?.() ?? of({});
+
+    this.sub.add(
+      messages$.subscribe((msg: WsMsg) => {
+        // You can surface live text if you emit {message: "..."} from the backend
+        if (msg?.message) this.message = msg.message;
+
+        if (msg?.type === 'complete') {
+          this.router.navigate(['/pruning-adjustments']);
+        } else if (msg?.type === 'error') {
+          this.message = msg.message ?? 'An error occurred.';
         }
       })
     );
-
-    // this.simulateProgress();
-  }
-
-  simulateProgress() {
-    setTimeout(() => {
-        this.router.navigate(['/pruning-adjustments']);
-    }, 2000);
   }
 
   onCancel(): void {
-    this.router.navigate(["/"])
+    this.router.navigate(['/']);
   }
 
-  ngOnDestroy() {
-    this.subscription.unsubscribe();
+  ngOnDestroy(): void {
+    this.sub.unsubscribe();
   }
-
 }

@@ -1,103 +1,94 @@
+// apps/sustainability_dashboard/frontend_v2/src/app/services/websocket.service.ts
 import { Injectable } from '@angular/core';
-import {BehaviorSubject, Observable, Subject} from 'rxjs';
-import {WebsocketMessageRequest, WebsocketResponse} from '@app/types/websocket.types';
-import {environment} from '@env/environment';
+import { io, Socket } from 'socket.io-client';
+import { Subject, Observable } from 'rxjs';
+import { environment } from '@env/environment';
+import { UploadService } from '@app/services/upload.service';
 
-@Injectable({
-  providedIn: 'root'
-})
+type ConnStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
+
+@Injectable({ providedIn: 'root' })
 export class WebsocketService {
+  private socket?: Socket;
+  private uploadId: string | null = null;
 
-  private readonly apiUrl = `${environment.api.websocketProtocol}://${environment.api.hostname}`;
+  // subjects expected by legacy components
+  private connection$ = new Subject<ConnStatus>();
+  private messages$ = new Subject<any>();
 
-  public uploadId = new BehaviorSubject<string | null>(null);
-  private websocket: WebSocket | null = null;
-  private messagesSubject = new Subject<WebsocketResponse>();
-  private connectionStatusSubject = new BehaviorSubject<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
+  constructor(private readonly uploadService: UploadService) {}
 
-  constructor(
-    private readonly localStorage: Storage,
-  ) {
-    const storedUploadId = this.localStorage.getItem('uploadId');
-    if (!storedUploadId) {
-      return
-    }
-
-    this.uploadId.next(storedUploadId);
+  // --- helpers ---------------------------------------------------------------
+  private baseUrl(): string {
+    return `${environment.api.schema}://${environment.api.hostname}`;
   }
 
-  connect(): Observable<WebsocketResponse> {
+  // --- API expected by existing components -----------------------------------
+  connect(uploadId: string): void {
+    this.socket = io(this.baseUrl(), {
+      transports: ['websocket'],   // avoid long-polling churn
+      withCredentials: false,      // CORS simplicity for local
+    });
 
-    if (this.websocket) {
-      this.websocket.close();
-    }
+    this.socket.on('connect', () => {
+      this.connection$.next('connected');
+      this.socket!.emit('join', { upload_id: uploadId });
+    });
 
-    const uploadId = this.uploadId.value;
-    if (!uploadId) {
-      throw new Error('Upload ID is not set. Please set the UploadId before connecting.');
-    }
-
-    const wsUrl = `${this.apiUrl}/ws/${uploadId}`;
-
-    this.connectionStatusSubject.next('connecting');
-    this.websocket = new WebSocket(wsUrl);
-
-    this.websocket.onopen = (event) => {
-      this.connectionStatusSubject.next('connected');
-    };
-
-    this.websocket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        this.messagesSubject.next(data);
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
-      }
-    };
-
-    this.websocket.onclose = (event) => {
-      this.connectionStatusSubject.next('disconnected');
-      this.websocket = null;
-    };
-
-    this.websocket.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      this.connectionStatusSubject.next('error');
-    };
-
-    return this.messagesSubject.asObservable();
+    this.socket.on('status', (msg) => this.messages$.next(msg));
+    this.socket.on('disconnect', () => this.connection$.next('disconnected'));
+    this.socket.on('connect_error', (err) => this.messages$.next({type:'error', message: String(err)}));
   }
 
-  sendMessage(message: WebsocketMessageRequest): void {
-    if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-      this.websocket.send(JSON.stringify(message));
-    } else {
-      console.warn('WebSocket is not connected. Message not sent:', message);
-    }
+  getConnectionStatus(): Observable<ConnStatus> {
+    return this.connection$.asObservable();
   }
 
-  getMessages(): Observable<WebsocketResponse> {
-    return this.messagesSubject.asObservable();
+  getMessages(): Observable<any> {
+    return this.messages$.asObservable();
+  }
+
+  /**
+   * Generic sender used by some existing components:
+   * sendMessage({ event: 'start', data: {...} })
+   */
+  sendMessage(msg: { event?: string; type?: string; data?: any } & Record<string, any>): void {
+    if (!this.socket) return;
+
+    // Determine the event name (prefer `event`, fallback to legacy `type`)
+    const event = (msg.event ?? msg.type) as string;
+    if (!event) return;
+
+    // Build payload:
+    // - If `data` is provided, use it.
+    // - Otherwise, use all properties except `event` / `type`.
+    const { event: _e, type: _t, ...rest } = msg;
+    const payload = msg.data ?? rest;
+
+    this.socket.emit(event, payload);
+  }
+
+  // --- Convenience methods used elsewhere ------------------------------------
+  set UploadId(id: string | null) {
+    this.uploadId = id;
+  }
+  get UploadId(): string | null {
+    return this.uploadId;
+  }
+
+  start(): void {
+    if (!this.socket) return;
+    this.socket.emit('start', { upload_id: this.uploadId });
+  }
+
+  validate(threshold: number): void {
+    if (!this.socket) return;
+    this.socket.emit('validate', { upload_id: this.uploadId, threshold });
   }
 
   disconnect(): void {
-    if (this.websocket) {
-      this.websocket.close();
-      this.websocket = null;
-      this.connectionStatusSubject.next('disconnected');
-    }
-  }
-
-  getConnectionStatus(): Observable<'connecting' | 'connected' | 'disconnected' | 'error'> {
-    return this.connectionStatusSubject.asObservable();
-  }
-
-  get isConnected(): boolean {
-    return this.websocket?.readyState === WebSocket.OPEN;
-  }
-
-  set UploadId(uploadId: string) {
-    this.uploadId.next(uploadId);
-    this.localStorage.setItem('uploadId', uploadId);
+    this.socket?.disconnect();
+    this.socket = undefined;
+    this.connection$.next('disconnected');
   }
 }

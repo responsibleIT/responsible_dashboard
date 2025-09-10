@@ -1,13 +1,20 @@
+<!-- apps/.../form-input-file.component.html -->
 <div class="form-input-file">
   <label *ngIf="label">{{ label }}</label>
+
   <div class="file-upload-container" (click)="triggerFileInput()">
-    <span class="file-name">{{ fileName || placeholder }}</span>
+    <span class="file-name">{{ filename || placeholder }}</span>
+
     <input
       type="file"
       [id]="id"
+      [attr.accept]="accept || null"
       (change)="onFileSelected($event)"
-      [formControl]="control"
       [attr.aria-required]="required ? 'true' : null"
-      hidden>
+      hidden
+    />
   </div>
+
+  <!-- Optional “Clear” action (use from parent template if needed) -->
+  <!-- <button type="button" (click)="clear()">Clear</button> -->
 </div>

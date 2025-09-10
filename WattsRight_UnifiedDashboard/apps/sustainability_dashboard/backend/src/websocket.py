@@ -1,9 +1,10 @@
+# apps/sustainability_dashboard/backend/src/websocket.py
 import os
 import json
 import asyncio
 import copy
 import pandas as pd
-from flask_socketio import emit, join_room, leave_room
+from flask_socketio import join_room, leave_room  # <- no plain emit import
 from dotenv import load_dotenv
 
 from loading import load_huggingface_model, load_local_model
@@ -15,15 +16,12 @@ import glob
 
 load_dotenv()
 
-DEMO_MODE = "false" #os.getenv("DEMO", "false").lower() == "true"
+DEMO_MODE = "false"
 UPLOAD_DIR = "uploads"
 THRESHOLDS = [i * 0.1 for i in range(1, 100)]
-LABEL_MAPPING = {0: 'Ham', 1: 'Spam'}
-
 
 # --- Helper Functions ---
 def find_local_model(upload_id: str) -> str | None:
-    """Return the first local model file path (.h5 or .keras) in this upload, if any."""
     base = get_upload_path(upload_id)
     for ext in (".h5", ".keras"):
         matches = glob.glob(os.path.join(base, f"*{ext}"))
@@ -60,24 +58,47 @@ def get_huggingface_url(upload_id):
         return None
     return open(path).read().strip()
 
-def create_baseline_metrics(metrics, model_info, threshold=0):
+def load_selected_columns(upload_id) -> tuple[str, str | None]:
+    meta_path = os.path.join(get_upload_path(upload_id), "selected_columns.json")
+    if os.path.exists(meta_path):
+        with open(meta_path, "r") as f:
+            data = json.load(f)
+        # only target is required now
+        return data.get("text_column"), data.get("target_column")
+    # fallback for older flows
+    flag_path = os.path.join(get_upload_path(upload_id), "flag.json")
+    if os.path.exists(flag_path):
+        with open(flag_path, "r") as f:
+            data = json.load(f)
+        return data.get("text_column"), data.get("target_column")
+    return None, None
+
+def infer_label_mapping(series: pd.Series) -> dict[int, str]:
+    uniques = list(pd.unique(series))
+    try:
+        uniques_sorted = sorted(uniques)
+    except Exception:
+        uniques_sorted = uniques
+    return {i: str(uniques_sorted[i]) for i in range(len(uniques_sorted))}
+
+def create_baseline_metrics(metrics, model_info, label_mapping: dict[int, str], threshold=0):
     return {
         "accuracy": metrics['overall']['accuracy'],
         "precision": metrics['overall']['precision'],
         "recall": metrics['overall']['recall'],
         "f1_score": metrics['overall']['f1_score'],
         "per_class": {
-            LABEL_MAPPING[label]: {
+            label_mapping[label]: {
                 "accuracy": metrics[label]['accuracy'],
                 "precision": metrics[label]['precision'],
                 "recall": metrics[label]['recall'],
-                "f1_score": metrics[label]['f1_score']
+                "f1_score": metrics[label]['f1_score'],
             } for label in metrics if label != 'overall'
         },
         "flops": model_info['original']['flops_estimate'] if threshold == 0 else model_info['after_pruning']['flops_estimate'],
         "non_zero_params": model_info['original']['non_zero_params'] if threshold == 0 else model_info['after_pruning']['non_zero_params'],
         "params_reduction_pct": model_info['after_pruning']['params_reduction_pct'],
-        "flops_reduction_pct": model_info['after_pruning']['flops_reduction_pct']
+        "flops_reduction_pct": model_info['after_pruning']['flops_reduction_pct'],
     }
 
 def create_threshold_data_entry(metrics, threshold):
@@ -86,15 +107,13 @@ def create_threshold_data_entry(metrics, threshold):
         "flops": metrics['after_pruning']['flops_estimate'],
         "non_zero_params": metrics['after_pruning']['non_zero_params'],
         "params_reduction_pct": metrics['after_pruning']['params_reduction_pct'],
-        "flops_reduction_pct": metrics['after_pruning']['flops_reduction_pct']
+        "flops_reduction_pct": metrics['after_pruning']['flops_reduction_pct'],
     }
 
-def create_benchmark_data(hf_url, threshold, gpu, location, benchmark, model_info, pruned_data):
+def create_benchmark_data(hf_url, threshold, benchmark, model_info, pruned_data, label_mapping: dict[int, str]):
     data = {
         "model": hf_url,
         "threshold": threshold,
-        "gpu": gpu,
-        "location": location,
         "overall": {},
         "perClass": {},
         "originalFlops": model_info['original']['flops_estimate'],
@@ -110,18 +129,19 @@ def create_benchmark_data(hf_url, threshold, gpu, location, benchmark, model_inf
             "pruned": benchmark['overall'][metric],
         }
 
-    for label, metrics in benchmark.items():
-        if label == 'overall': continue
-        label_name = LABEL_MAPPING.get(label, label)
-        data['perClass'][label_name] = {
-            metric: {
-                "original": pruned_data['0']['per_class'][label_name][metric],
-                "pruned": metrics[metric]
-            } for metric in ['accuracy', 'precision', 'recall']
+    for label, m in benchmark.items():
+        if label == 'overall':
+            continue
+        name = label_mapping.get(label, str(label))
+        data['perClass'][name] = {
+            k: {
+                "original": pruned_data['0']['per_class'][name][k],
+                "pruned": m[k],
+            } for k in ['accuracy', 'precision', 'recall']
         }
-        data['perClass'][label_name]['f1Score'] = {
-            "original": pruned_data['0']['per_class'][label_name]['f1_score'],
-            "pruned": metrics['f1_score']
+        data['perClass'][name]['f1Score'] = {
+            "original": pruned_data['0']['per_class'][name]['f1_score'],
+            "pruned": m['f1_score'],
         }
     return data
 
@@ -140,71 +160,77 @@ def websocket_handlers(socketio):
     @socketio.on('join')
     def on_join(data):
         upload_id = data.get("upload_id")
-        join_room(upload_id)
-        emit("status", {"type": "connection", "status": "connected", "upload_id": upload_id})
+        if upload_id:
+            join_room(upload_id)
+        # acknowledge to this client
+        socketio.emit("status", {"type": "connection", "status": "connected", "upload_id": upload_id}, to=upload_id)
 
     @socketio.on('start')
     def handle_start(data):
         upload_id = data.get("upload_id")
 
-        async def process():
+        def process():
             try:
-                emit("status", {"message": "Model is being loaded..."}, to=upload_id)
+                socketio.emit("status", {"message": "Model is being loaded..."}, to=upload_id)
 
-                # Load dataset (expects uploads/<id>/dataset.csv)
+                # Load dataset and selected columns (target only required)
                 df = load_dataset(upload_id)
+                _, target_col = load_selected_columns(upload_id)
+                if target_col and target_col in df.columns:
+                    df = df.rename(columns={target_col: 'label'})
+                # Build label mapping
+                label_mapping = infer_label_mapping(df['label'])
 
-                # Decide model source: Hugging Face URL first, else local model file
-                huggingface_url = get_huggingface_url(upload_id)
+                # Model source
+                hf_url = get_huggingface_url(upload_id)
                 local_model_path = find_local_model(upload_id)
 
-                if huggingface_url:
-                    model, tokenizer = load_huggingface_model(huggingface_url)
-                    model_name_for_logs = huggingface_url
+                if hf_url:
+                    model, tokenizer = load_huggingface_model(hf_url)
+                    model_name_for_logs = hf_url
                 elif local_model_path:
                     model, tokenizer = load_local_model(local_model_path)
                     model_name_for_logs = os.path.basename(local_model_path)
                 else:
-                    emit("status", {
+                    socketio.emit("status", {
                         "type": "error",
                         "message": "No model provided. Enter a Hugging Face repo or upload a .h5/.keras file."
                     }, to=upload_id)
                     return
 
-                # Prune a copy at 10% for the initial pair of baselines
+                # Initial prune at 10%
                 model_copy = copy.deepcopy(model)
                 pruned_model, model_info = disable_low_weight_neurons(model_copy, 10)
 
-                emit("status", {"message": "Benchmarking model..."}, to=upload_id)
+                socketio.emit("status", {"message": "Benchmarking model..."}, to=upload_id)
                 baseline = evaluate_model(model, tokenizer, df)
                 pruned = evaluate_model(pruned_model, tokenizer, df)
 
-                emit("status", {"message": "Collecting pruning data..."}, to=upload_id)
+                socketio.emit("status", {"message": "Collecting pruning data..."}, to=upload_id)
                 pruned_data = {
-                    0: create_baseline_metrics(baseline, model_info, 0),
-                    10: create_baseline_metrics(pruned, model_info, 10)
+                    0: create_baseline_metrics(baseline, model_info, label_mapping, 0),
+                    10: create_baseline_metrics(pruned, model_info, label_mapping, 10),
                 }
 
-                # Sweep thresholds (0.1 .. 9.9 as defined in THRESHOLDS)
                 for t in THRESHOLDS:
                     t = round(t, 1)
                     m_copy = copy.deepcopy(model)
                     p_model, metrics = disable_low_weight_neurons(m_copy, t)
                     pruned_data[t] = create_threshold_data_entry(metrics, t)
 
-                emit("status", {"message": "Predicting performance..."}, to=upload_id)
+                socketio.emit("status", {"message": "Predicting performance..."}, to=upload_id)
                 pruned_data = predict_with_auto_regressive_model(pruned_data, "accuracy")
 
-                # Persist for the validate step
                 save_json_file(upload_id, "pruned_threshold_data.json", pruned_data)
+                save_json_file(upload_id, "label_mapping.json", label_mapping)
 
-                emit("status", {
+                socketio.emit("status", {
                     "message": f"Benchmark completed successfully for {model_name_for_logs}",
                     "type": "complete"
                 }, to=upload_id)
 
             except Exception as e:
-                emit("status", {"type": "error", "message": f"Start failed: {e}"}, to=upload_id)
+                socketio.emit("status", {"type": "error", "message": f"Start failed: {e}"}, to=upload_id)
 
         socketio.start_background_task(process)
 
@@ -212,57 +238,57 @@ def websocket_handlers(socketio):
     def handle_validate(data):
         upload_id = data.get("upload_id")
         threshold = data.get("threshold")
-        gpu = data.get("gpu")
-        location = data.get("location")
 
-        async def process():
+        def process():
             try:
-                emit("status", {"message": "Model is being loaded..."}, to=upload_id)
+                socketio.emit("status", {"message": "Model is being loaded..."}, to=upload_id)
 
-                # Load dataset
                 df = load_dataset(upload_id)
+                _, target_col = load_selected_columns(upload_id)
+                if target_col and target_col in df.columns:
+                    df = df.rename(columns={target_col: 'label'})
 
-                # Decide model source again (same rule as in start)
-                huggingface_url = get_huggingface_url(upload_id)
+                try:
+                    label_mapping = load_json_file(upload_id, "label_mapping.json")
+                except Exception:
+                    label_mapping = infer_label_mapping(df['label'])
+
+                hf_url = get_huggingface_url(upload_id)
                 local_model_path = find_local_model(upload_id)
 
-                if huggingface_url:
-                    model, tokenizer = load_huggingface_model(huggingface_url)
-                    model_id_for_benchmark = huggingface_url
+                if hf_url:
+                    model, tokenizer = load_huggingface_model(hf_url)
+                    model_id_for_benchmark = hf_url
                 elif local_model_path:
                     model, tokenizer = load_local_model(local_model_path)
                     model_id_for_benchmark = os.path.basename(local_model_path)
                 else:
-                    emit("status", {
+                    socketio.emit("status", {
                         "type": "error",
-                        "message": "No model available to validate. Run the start step with a HF URL or upload a model."
+                        "message": "No model available to validate. Run the start step first."
                     }, to=upload_id)
                     return
 
-                # Apply chosen threshold and evaluate
                 pruned_model, model_info = disable_low_weight_neurons(model, threshold)
 
-                emit("status", {"message": "Benchmarking model..."}, to=upload_id)
+                socketio.emit("status", {"message": "Benchmarking model..."}, to=upload_id)
                 benchmark = evaluate_model(pruned_model, tokenizer, df)
 
-                # Load predictions from start step
                 pruned_data = load_json_file(upload_id, "pruned_threshold_data.json")
 
-                # Build and save full benchmark payload
                 benchmark_data = create_benchmark_data(
-                    model_id_for_benchmark, threshold, gpu, location,
-                    benchmark, model_info, pruned_data
+                    model_id_for_benchmark, threshold, benchmark, model_info, pruned_data, label_mapping
                 )
                 save_json_file(upload_id, "benchmark_data.json", benchmark_data)
 
-                emit("status", {"message": "Validation completed successfully", "type": "complete"}, to=upload_id)
+                socketio.emit("status", {"message": "Validation completed successfully", "type": "complete"}, to=upload_id)
 
             except FileNotFoundError as e:
-                emit("status", {
+                socketio.emit("status", {
                     "type": "error",
                     "message": f"Missing file: {e}. Make sure dataset.csv exists and that you ran the start step."
                 }, to=upload_id)
             except Exception as e:
-                emit("status", {"type": "error", "message": f"Validate failed: {e}"}, to=upload_id)
+                socketio.emit("status", {"type": "error", "message": f"Validate failed: {e}"}, to=upload_id)
 
         socketio.start_background_task(process)

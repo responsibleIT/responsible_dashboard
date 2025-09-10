@@ -37,11 +37,8 @@ import { environment } from '@env/environment';
   styleUrl: './upload.modal.scss'
 })
 export class UploadModal implements OnDestroy {
-  // ------- backing lists for selects -------
+  // Only the target dropdown is needed
   csvColumns: string[] = [];
-  gpus: string[] = [];
-  locations: string[] = [];
-  metrics: string[] = [];
 
   private readonly apiBase = `${environment.api.schema}://${environment.api.hostname}`;
 
@@ -53,14 +50,13 @@ export class UploadModal implements OnDestroy {
     private readonly websocketService: WebsocketService,
     private readonly http: HttpClient
   ) {
-    this.loadSettings();
-    // watch dataset file to extract CSV header
+    // When dataset changes, read header and populate dropdown
     this.uploadFormGroup.controls.dataset.valueChanges.subscribe(f => {
       if (f instanceof File) this.readCsvHeader(f);
     });
   }
 
-  // ------- either/or validator for HF URL vs H5 model -------
+  // either/or validator for HF URL vs H5 model
   private eitherOrValidator(controlNames: (keyof UploadFormControls)[]) {
     return (group: AbstractControl): ValidationErrors | null => {
       const values = controlNames.map(n => (group.get(n as string)?.value));
@@ -71,23 +67,15 @@ export class UploadModal implements OnDestroy {
     };
   }
 
-  // ------- form model -------
-  uploadFormGroup = this.formBuilder.group<UploadForm>({
-    huggingfaceModel: new FormControl<string | null>(null),
-    h5Model: new FormControl<File | null>(null),
-    dataset: new FormControl<File | null>(null, { validators: [Validators.required] }),
+  // form model (no textCol anymore)
+  public uploadFormGroup = this.formBuilder.group({
+    huggingfaceModel: this.formBuilder.control<string | null>(null),
+    h5Model:          this.formBuilder.control<File | null>(null),
+    dataset:          this.formBuilder.control<File | null>(null, [Validators.required]),
+    targetCol:        this.formBuilder.control<string | null>(null),
+  }, { validators: [this.eitherOrValidator(['huggingfaceModel', 'h5Model'])] });
 
-    // NEW selects
-    textCol: new FormControl<string | null>(null),
-    targetCol: new FormControl<string | null>(null),
-    gpu: new FormControl<string | null>(null),
-    location: new FormControl<string | null>(null),
-    metric: new FormControl<string | null>(null),
-  }, {
-    validators: [this.eitherOrValidator(['huggingfaceModel', 'h5Model'])]
-  });
-
-  // convenience getters for template/types
+  // convenience getters for error messages
   get neitherFieldFilledError(): boolean {
     const g = this.uploadFormGroup;
     const err = g.hasError('eitherOr') && (g.touched || g.dirty);
@@ -99,20 +87,15 @@ export class UploadModal implements OnDestroy {
     return err && !!g.controls.huggingfaceModel.value && !!g.controls.h5Model.value;
   }
 
-  // button enablement (also used by template)
+  // enable submit only when: model provided, dataset chosen, target column selected
   canSubmit(): boolean {
     const g = this.uploadFormGroup;
-    if (g.invalid) return false;
-    // need HF URL or H5
     const hasModel = !!g.controls.huggingfaceModel.value || !!g.controls.h5Model.value;
-    // need dataset
-    const hasDataset = !!g.controls.dataset.value;
-    // need text + target columns
-    const hasCols = !!g.controls.textCol.value && !!g.controls.targetCol.value;
-    return hasModel && hasDataset && hasCols;
+    const hasDataset = g.controls.dataset.value instanceof File;
+    const hasTarget = !!g.controls.targetCol.value;
+    return hasModel && hasDataset && hasTarget && !g.hasError('eitherOr');
   }
 
-  // ------- submit -------
   async submitForm(): Promise<void> {
     const g = this.uploadFormGroup;
     if (!this.canSubmit()) {
@@ -129,12 +112,12 @@ export class UploadModal implements OnDestroy {
     if (h5ModelFile) formData.append('model', h5ModelFile);
     if (datasetFile) formData.append('dataset', datasetFile);
 
-    // store selections for later websocket flow
-    this.uploadService.TextColumn       = g.controls.textCol.value ?? null;
-    this.uploadService.TargetColumn     = g.controls.targetCol.value ?? null;
-    this.uploadService.SelectedGPU      = g.controls.gpu.value ?? null;
-    this.uploadService.SelectedLocation = g.controls.location.value ?? null;
-    this.uploadService.SelectedMetric   = g.controls.metric.value ?? null;
+    // 🔥 Add this block
+   const target = this.uploadFormGroup.controls.targetCol.value;
+    if (target) {
+      formData.append('selected_columns', JSON.stringify({ target_column: target }));
+    }
+    // 🔥 End block
 
     try {
       const uploadId = await firstValueFrom(
@@ -154,38 +137,42 @@ export class UploadModal implements OnDestroy {
     }
   }
 
-  // ------- helpers -------
-  private async loadSettings(): Promise<void> {
-    try {
-      const s = await firstValueFrom(this.http.get<{gpus:string[];locations:string[];metrics:string[]}>(`${this.apiBase}/settings`));
-      this.gpus = s.gpus ?? [];
-      this.locations = s.locations ?? [];
-      this.metrics = s.metrics ?? [];
-    } catch (e) {
-      console.warn('Failed to load settings', e);
-      this.gpus = [];
-      this.locations = [];
-      this.metrics = [];
-    }
-  }
-
+  // read the first line of CSV to populate column names
   private readCsvHeader(file: File): void {
     const reader = new FileReader();
     reader.onload = () => {
-      const text = (reader.result as string) || '';
+      const text = (reader.result as string) ?? '';
       const firstLine = text.split(/\r?\n/)[0] ?? '';
-      // very basic CSV split; your project may have a CSV parser you can use instead
-      const cols = firstLine
-        .split(',')
-        .map(c => c.trim().replace(/^"(.*)"$/,'$1'))
-        .filter(c => c.length > 0);
+
+      // strip BOM if present
+      const line = firstLine.replace(/^\uFEFF/, '');
+
+      // detect delimiter (comma, semicolon, or tab)
+      const delimiters = [',', ';', '\t'];
+      const best = delimiters
+        .map(d => ({ d, parts: line.split(d).length }))
+        .sort((a, b) => b.parts - a.parts)[0]?.d ?? ',';
+
+      const cols = line
+        .split(best)
+        .map(c => c.trim().replace(/^"(.*)"$/, '$1'))
+        .filter(Boolean);
+
       this.csvColumns = cols;
-      // reset the selects if they’re no longer valid
-      const g = this.uploadFormGroup;
-      if (!cols.includes(g.controls.textCol.value ?? '')) g.controls.textCol.setValue(null);
-      if (!cols.includes(g.controls.targetCol.value ?? '')) g.controls.targetCol.setValue(null);
+
+      // if current target not valid, reset
+      const tgt = this.uploadFormGroup.controls.targetCol.value;
+      if (!cols.includes(tgt ?? '')) {
+        this.uploadFormGroup.controls.targetCol.setValue(null);
+      }
     };
     reader.readAsText(file);
+  }
+
+  ngOnInit(): void {
+    this.uploadFormGroup.controls.dataset.valueChanges.subscribe(file => {
+      if (file instanceof File) this.readCsvHeader(file);
+    });
   }
 
   ngOnDestroy(): void {
@@ -193,17 +180,9 @@ export class UploadModal implements OnDestroy {
   }
 }
 
-/** Strongly-typed form model */
 type UploadFormControls = {
   huggingfaceModel: FormControl<string | null>;
   h5Model: FormControl<File | null>;
   dataset: FormControl<File | null>;
-  textCol: FormControl<string | null>;
   targetCol: FormControl<string | null>;
-  gpu: FormControl<string | null>;
-  location: FormControl<string | null>;
-  metric: FormControl<string | null>;
-};
-type UploadForm = {
-  [K in keyof UploadFormControls]: UploadFormControls[K];
 };
