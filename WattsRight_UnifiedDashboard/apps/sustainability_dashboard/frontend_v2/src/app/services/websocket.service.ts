@@ -12,32 +12,41 @@ export class WebsocketService {
   private socket?: Socket;
   private uploadId: string | null = null;
 
-  // subjects expected by legacy components
   private connection$ = new Subject<ConnStatus>();
   private messages$ = new Subject<any>();
 
-  constructor(private readonly uploadService: UploadService) {}
+  constructor(private readonly uploadService: UploadService) {
+    // keep in sync with UploadService so we always have the latest id
+    this.uploadService.uploadId.subscribe(id => (this.uploadId = id));
+  }
 
-  // --- helpers ---------------------------------------------------------------
   private baseUrl(): string {
     return `${environment.api.schema}://${environment.api.hostname}`;
   }
 
-  // --- API expected by existing components -----------------------------------
   connect(uploadId: string): void {
+    // IMPORTANT: remember it
+    this.uploadId = uploadId;
+
     this.socket = io(this.baseUrl(), {
-      transports: ['websocket'],   // avoid long-polling churn
-      withCredentials: false,      // CORS simplicity for local
+      transports: ['websocket'],
+      withCredentials: false,
     });
+
+    this.connection$.next('connecting');
 
     this.socket.on('connect', () => {
       this.connection$.next('connected');
-      this.socket!.emit('join', { upload_id: uploadId });
+      // join the room for this upload
+      this.socket!.emit('join', { upload_id: this.uploadId });
     });
 
     this.socket.on('status', (msg) => this.messages$.next(msg));
     this.socket.on('disconnect', () => this.connection$.next('disconnected'));
-    this.socket.on('connect_error', (err) => this.messages$.next({type:'error', message: String(err)}));
+    this.socket.on('connect_error', (err) => {
+      this.connection$.next('error');
+      this.messages$.next({ type: 'error', message: String(err) });
+    });
   }
 
   getConnectionStatus(): Observable<ConnStatus> {
@@ -59,27 +68,21 @@ export class WebsocketService {
   sendMessage(msg: { event?: string; type?: string; data?: any } & Record<string, any>): void {
     if (!this.socket) return;
 
-    // Determine the event name (prefer `event`, fallback to legacy `type`)
     const event = (msg.event ?? msg.type) as string;
     if (!event) return;
 
-    // Build payload:
-    // - If `data` is provided, use it.
-    // - Otherwise, use all properties except `event` / `type`.
     const { event: _e, type: _t, ...rest } = msg;
-    const payload = msg.data ?? rest;
+    const payload = (msg.data ?? rest) ?? {};
+
+    // Auto-attach upload_id if not provided
+    if (this.uploadId && payload.upload_id == null) {
+      payload.upload_id = this.uploadId;
+    }
 
     this.socket.emit(event, payload);
   }
 
-  // --- Convenience methods used elsewhere ------------------------------------
-  set UploadId(id: string | null) {
-    this.uploadId = id;
-  }
-  get UploadId(): string | null {
-    return this.uploadId;
-  }
-
+  // Convenience methods
   start(): void {
     if (!this.socket) return;
     this.socket.emit('start', { upload_id: this.uploadId });
@@ -95,4 +98,8 @@ export class WebsocketService {
     this.socket = undefined;
     this.connection$.next('disconnected');
   }
+
+  // Setter kept for compatibility if you set it manually elsewhere
+  set UploadId(id: string | null) { this.uploadId = id; }
+  get UploadId(): string | null { return this.uploadId; }
 }

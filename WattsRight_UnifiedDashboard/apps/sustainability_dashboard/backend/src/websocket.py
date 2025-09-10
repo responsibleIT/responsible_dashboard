@@ -3,6 +3,7 @@ import os
 import json
 import asyncio
 import copy
+from flask import request
 import pandas as pd
 import time
 import threading
@@ -231,21 +232,48 @@ def websocket_handlers(socketio):
     def handle_start(data):
         upload_id = data.get("upload_id")
 
+        # respond to just this client if upload_id missing
+        if not upload_id:
+            socketio.emit(
+                "status",
+                {"type": "error", "message": "No upload_id provided. Please retry."},
+                to=request.sid
+            )
+            return
+
+        upload_path = get_upload_path(upload_id)
+        if not os.path.exists(upload_path):
+            socketio.emit(
+                "status",
+                {"type": "error", "message": f"Upload {upload_id} not found on server."},
+                to=request.sid
+            )
+            return
+
         def process():
             try:
                 socketio.emit("status", {"message": "Model is being loaded..."}, to=upload_id)
 
-                # Load dataset and selected columns (target only required)
+                # Load dataset and read chosen target column
                 df = load_dataset(upload_id)
-                _, target_col = load_selected_columns(upload_id)
-                
-                # Build label mapping
+                # You persist selected columns as selected_columns.json in /upload
+                with suppress(Exception):
+                    cols = load_json_file(upload_id, "selected_columns.json")
+                    target_col = cols.get("target_column")
+                if not target_col or target_col not in df.columns:
+                    socketio.emit(
+                        "status",
+                        {"type": "error", "message": "Target column not found in dataset."},
+                        to=upload_id
+                    )
+                    return  # <-- never use exit()
+
+                # Build label mapping from actual labels
                 label_mapping = infer_label_mapping(df[target_col])
 
-                # Model source
+                # Model source (HF URL preferred, else local)
                 hf_url = get_huggingface_url(upload_id)
                 local_model_path = find_local_model(upload_id)
-
                 if hf_url:
                     model, tokenizer = load_huggingface_model(hf_url)
                     model_name_for_logs = hf_url
@@ -253,31 +281,33 @@ def websocket_handlers(socketio):
                     model, tokenizer = load_local_model(local_model_path)
                     model_name_for_logs = os.path.basename(local_model_path)
                 else:
-                    socketio.emit("status", {
-                        "type": "error",
-                        "message": "No model provided. Enter a Hugging Face repo or upload a .h5/.keras file."
-                    }, to=upload_id)
+                    socketio.emit(
+                        "status",
+                        {"type": "error",
+                        "message": "No model provided. Enter a Hugging Face repo or upload a .h5/.keras file."},
+                        to=upload_id
+                    )
                     return
 
-                # Initial prune at 10%
+                # Initial prune at 10% for two baselines
                 model_copy = copy.deepcopy(model)
                 pruned_model, model_info = disable_low_weight_neurons(model_copy, 10)
 
                 socketio.emit("status", {"message": "Benchmarking model..."}, to=upload_id)
-
                 baseline = evaluate_model(model, tokenizer, df, target_col=target_col)
                 pruned = evaluate_model(pruned_model, tokenizer, df, target_col=target_col)
 
                 socketio.emit("status", {"message": "Collecting pruning data..."}, to=upload_id)
                 pruned_data = {
-                    0: create_baseline_metrics(baseline, model_info, label_mapping, 0),
-                    10: create_baseline_metrics(pruned, model_info, label_mapping, 10),
+                    0:  create_baseline_metrics(baseline, model_info, label_mapping, 0),
+                    10: create_baseline_metrics(pruned,   model_info, label_mapping, 10),
                 }
 
+                # Sweep thresholds
                 for t in THRESHOLDS:
                     t = round(t, 1)
                     m_copy = copy.deepcopy(model)
-                    p_model, metrics = disable_low_weight_neurons(m_copy, t)
+                    _p_model, metrics = disable_low_weight_neurons(m_copy, t)
                     pruned_data[t] = create_threshold_data_entry(metrics, t)
 
                 socketio.emit("status", {"message": "Predicting performance..."}, to=upload_id)
