@@ -4,7 +4,10 @@ import json
 import asyncio
 import copy
 import pandas as pd
-from flask_socketio import join_room, leave_room  # <- no plain emit import
+import time
+import threading
+from contextlib import suppress
+from flask_socketio import join_room  # <- no plain emit import
 from dotenv import load_dotenv
 
 from loading import load_huggingface_model, load_local_model
@@ -145,6 +148,65 @@ def create_benchmark_data(hf_url, threshold, benchmark, model_info, pruned_data,
         }
     return data
 
+def detect_local_device() -> str:
+    """
+    Try to detect the local accelerator. Returns a human-friendly device name,
+    or 'CPU' as a fallback. This function is backend-agnostic and safe.
+    """
+    # 1) Try PyTorch
+    with suppress(Exception):
+        import torch
+        if torch.cuda.is_available():
+            idx = torch.cuda.current_device()
+            return torch.cuda.get_device_name(idx)
+
+    # 2) Try TensorFlow
+    with suppress(Exception):
+        import tensorflow as tf
+        gpus = tf.config.list_physical_devices('GPU')
+        if gpus:
+            # name field can be verbose; return something readable
+            return getattr(gpus[0], 'name', 'TensorFlow GPU')
+
+    # 3) Try nvidia-smi directly
+    with suppress(Exception):
+        import subprocess, shlex
+        out = subprocess.check_output(
+            shlex.split("nvidia-smi --query-gpu=name --format=csv,noheader"),
+            stderr=subprocess.DEVNULL, timeout=1.5
+        )
+        name = out.decode("utf-8", errors="ignore").strip().splitlines()[0]
+        if name:
+            return name
+
+    return "CPU"
+
+def sample_gpu_power_background(stop_evt: threading.Event, interval: float = 0.2):
+    """
+    If NVML is present, sample total board power (Watts) in the background.
+    Returns a list that will be populated with float readings.
+    If NVML is not available, returns an empty list and does nothing.
+    """
+    readings: list[float] = []
+
+    def _runner():
+        with suppress(Exception):
+            import pynvml  # pip install nvidia-ml-py3
+            pynvml.nvmlInit()
+            try:
+                h = pynvml.nvmlDeviceGetHandleByIndex(0)
+                while not stop_evt.is_set():
+                    mw = pynvml.nvmlDeviceGetPowerUsage(h)  # milliwatts
+                    readings.append(mw / 1000.0)  # -> Watts
+                    stop_evt.wait(interval)
+            finally:
+                with suppress(Exception):
+                    pynvml.nvmlShutdown()
+
+    # try to start; if import fails, thread will never add data
+    t = threading.Thread(target=_runner, daemon=True)
+    t.start()
+    return readings, t
 
 # --- Main WebSocket Handler ---
 def websocket_handlers(socketio):
@@ -292,3 +354,103 @@ def websocket_handlers(socketio):
                 socketio.emit("status", {"type": "error", "message": f"Validate failed: {e}"}, to=upload_id)
 
         socketio.start_background_task(process)
+    
+        @socketio.on('benchmark_real')
+        def handle_benchmark_real(data):
+            """
+            Run a *real* benchmark on this machine:
+            - load model (HF or local)
+            - prune at requested threshold
+            - time a real evaluation on the uploaded dataset
+            - optionally sample real GPU power with NVML
+            - persist results under 'realBenchmark' in benchmark_data.json
+            """
+            upload_id = data.get("upload_id")
+            threshold = data.get("threshold")
+
+            async def process():
+                try:
+                    socketio.emit("status", {"message": "Preparing real benchmark..."}, to=upload_id)
+
+                    # 1) Load dataset & columns
+                    df = load_dataset(upload_id)
+                    # load selected columns if you are using the new target-only flow
+                    with suppress(Exception):
+                        cols = load_json_file(upload_id, "selected_columns.json")
+                        target_col = cols.get("target_column")
+                        if target_col and target_col in df.columns:
+                            # Evaluate path already expects text/label names. If your evaluator
+                            # relies on specific names, rename here; otherwise you can skip this.
+                            pass
+
+                    # 2) Load model (HF first, else local)
+                    hf_url = get_huggingface_url(upload_id)
+                    local_model_path = find_local_model(upload_id)
+
+                    if hf_url:
+                        model, tokenizer = load_huggingface_model(hf_url)
+                        model_id_for_benchmark = hf_url
+                    elif local_model_path:
+                        model, tokenizer = load_local_model(local_model_path)
+                        model_id_for_benchmark = os.path.basename(local_model_path)
+                    else:
+                        socketio.emit("status", {
+                            "type": "error",
+                            "message": "No model available. Provide a HF repo or upload a model."
+                        }, to=upload_id)
+                        return
+
+                    # 3) Prune to requested threshold
+                    pruned_model, model_info = disable_low_weight_neurons(model, threshold)
+
+                    # 4) Time a *real* evaluation + optional GPU power sampling
+                    socketio.emit("status", {"message": "Running real benchmark..."}, to=upload_id)
+                    stop_evt = threading.Event()
+                    power_readings, power_thread = sample_gpu_power_background(stop_evt, interval=0.25)
+
+                    t0 = time.perf_counter()
+                    real_metrics = evaluate_model(pruned_model, tokenizer, df)  # your existing evaluator
+                    elapsed = time.perf_counter() - t0
+                    stop_evt.set()
+                    power_thread.join(timeout=0.5)
+
+                    # Aggregate power (if any)
+                    avg_watts = sum(power_readings) / len(power_readings) if power_readings else None
+                    energy_j = (avg_watts * elapsed) if avg_watts is not None else None
+
+                    # 5) Merge into benchmark_data.json (append 'realBenchmark')
+                    bench_path = os.path.join(get_upload_path(upload_id), "benchmark_data.json")
+                    base_payload = {}
+                    if os.path.exists(bench_path):
+                        with open(bench_path, "r", encoding="utf-8") as f:
+                            base_payload = json.load(f)
+
+                    base_payload.setdefault("model", model_id_for_benchmark)
+                    base_payload.setdefault("threshold", threshold)
+
+                    base_payload["realBenchmark"] = {
+                        "device": detect_local_device(),
+                        "elapsedSec": elapsed,
+                        "samples": int(len(df)),
+                        "throughputSamplesPerSec": (len(df) / elapsed) if elapsed > 0 else None,
+                        "avgGpuPowerW": avg_watts,       # may be None if NVML unavailable
+                        "energyJoules": energy_j,        # may be None
+                        "metrics": real_metrics.get("overall", {})  # accuracy/precision/recall/f1 from real run
+                    }
+
+                    with open(bench_path, "w", encoding="utf-8") as f:
+                        json.dump(base_payload, f, indent=2)
+
+                    socketio.emit("status", {
+                        "message": "Real benchmark completed",
+                        "type": "complete"
+                    }, to=upload_id)
+
+                except Exception as e:
+                    socketio.emit("status", {
+                        "type": "error",
+                        "message": f"Real benchmark failed: {e}"
+                    }, to=upload_id)
+
+            socketio.start_background_task(process)
+

@@ -18,3 +18,4 @@ transformers==4.31.0
 
 # Utilities
 psutil==5.9.8
+pynvml==13.0.1

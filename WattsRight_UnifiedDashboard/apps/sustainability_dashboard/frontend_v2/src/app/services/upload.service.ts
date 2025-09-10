@@ -68,9 +68,6 @@ export class UploadService {
   }
 
   // NEW setters used by your component:
-  set TextColumn(col: string | null) {
-    this.textColumn.next(col);
-  }
   set TargetColumn(col: string | null) {
     this.targetColumn.next(col);
   }
@@ -100,7 +97,6 @@ export class UploadService {
   }
 
   // NEW: current values (optional helpers)
-  get textColumnValue(): string | null { return this.textColumn.value; }
   get targetColumnValue(): string | null { return this.targetColumn.value; }
   get selectedGPUValue(): string | null { return this.selectedGPU.value; }
   get selectedLocationValue(): string | null { return this.selectedLocation.value; }

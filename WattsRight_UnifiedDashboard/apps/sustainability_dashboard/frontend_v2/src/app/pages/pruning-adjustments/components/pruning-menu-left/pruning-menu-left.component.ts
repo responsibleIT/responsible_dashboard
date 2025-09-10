@@ -37,8 +37,6 @@ export class PruningMenuLeftComponent {
     this.settingsService.Gpu = this.formGroup.controls.gpu.value
     this.settingsService.Location = this.formGroup.controls.location.value;
     this.settingsService.Threshold = this.formGroup.controls.threshold.value || 0;
-
     this.router.navigate(['/loading-benchmark']);
   }
-
 }

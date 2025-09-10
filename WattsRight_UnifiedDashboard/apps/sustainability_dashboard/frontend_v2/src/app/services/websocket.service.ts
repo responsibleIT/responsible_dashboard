@@ -48,6 +48,10 @@ export class WebsocketService {
     return this.messages$.asObservable();
   }
 
+  getUploadId(): string | null {
+    return this.uploadId;
+  }
+
   /**
    * Generic sender used by some existing components:
    * sendMessage({ event: 'start', data: {...} })
