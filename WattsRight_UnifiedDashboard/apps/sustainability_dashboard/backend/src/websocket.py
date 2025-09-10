@@ -238,10 +238,9 @@ def websocket_handlers(socketio):
                 # Load dataset and selected columns (target only required)
                 df = load_dataset(upload_id)
                 _, target_col = load_selected_columns(upload_id)
-                if target_col and target_col in df.columns:
-                    df = df.rename(columns={target_col: 'label'})
+                
                 # Build label mapping
-                label_mapping = infer_label_mapping(df['label'])
+                label_mapping = infer_label_mapping(df[target_col])
 
                 # Model source
                 hf_url = get_huggingface_url(upload_id)
@@ -265,8 +264,9 @@ def websocket_handlers(socketio):
                 pruned_model, model_info = disable_low_weight_neurons(model_copy, 10)
 
                 socketio.emit("status", {"message": "Benchmarking model..."}, to=upload_id)
-                baseline = evaluate_model(model, tokenizer, df)
-                pruned = evaluate_model(pruned_model, tokenizer, df)
+
+                baseline = evaluate_model(model, tokenizer, df, target_col=target_col)
+                pruned = evaluate_model(pruned_model, tokenizer, df, target_col=target_col)
 
                 socketio.emit("status", {"message": "Collecting pruning data..."}, to=upload_id)
                 pruned_data = {
@@ -355,102 +355,102 @@ def websocket_handlers(socketio):
 
         socketio.start_background_task(process)
     
-        @socketio.on('benchmark_real')
-        def handle_benchmark_real(data):
-            """
-            Run a *real* benchmark on this machine:
-            - load model (HF or local)
-            - prune at requested threshold
-            - time a real evaluation on the uploaded dataset
-            - optionally sample real GPU power with NVML
-            - persist results under 'realBenchmark' in benchmark_data.json
-            """
-            upload_id = data.get("upload_id")
-            threshold = data.get("threshold")
+    @socketio.on('benchmark_real')
+    def handle_benchmark_real(data):
+        """
+        Run a *real* benchmark on this machine:
+        - load model (HF or local)
+        - prune at requested threshold
+        - time a real evaluation on the uploaded dataset
+        - optionally sample real GPU power with NVML
+        - persist results under 'realBenchmark' in benchmark_data.json
+        """
+        upload_id = data.get("upload_id")
+        threshold = data.get("threshold")
 
-            async def process():
-                try:
-                    socketio.emit("status", {"message": "Preparing real benchmark..."}, to=upload_id)
+        async def process():
+            try:
+                socketio.emit("status", {"message": "Preparing real benchmark..."}, to=upload_id)
 
-                    # 1) Load dataset & columns
-                    df = load_dataset(upload_id)
-                    # load selected columns if you are using the new target-only flow
-                    with suppress(Exception):
-                        cols = load_json_file(upload_id, "selected_columns.json")
-                        target_col = cols.get("target_column")
-                        if target_col and target_col in df.columns:
-                            # Evaluate path already expects text/label names. If your evaluator
-                            # relies on specific names, rename here; otherwise you can skip this.
-                            pass
+                # 1) Load dataset & columns
+                df = load_dataset(upload_id)
+                # load selected columns if you are using the new target-only flow
+                with suppress(Exception):
+                    cols = load_json_file(upload_id, "selected_columns.json")
+                    target_col = cols.get("target_column")
+                    if target_col and target_col in df.columns:
+                        # Evaluate path already expects text/label names. If your evaluator
+                        # relies on specific names, rename here; otherwise you can skip this.
+                        pass
 
-                    # 2) Load model (HF first, else local)
-                    hf_url = get_huggingface_url(upload_id)
-                    local_model_path = find_local_model(upload_id)
+                # 2) Load model (HF first, else local)
+                hf_url = get_huggingface_url(upload_id)
+                local_model_path = find_local_model(upload_id)
 
-                    if hf_url:
-                        model, tokenizer = load_huggingface_model(hf_url)
-                        model_id_for_benchmark = hf_url
-                    elif local_model_path:
-                        model, tokenizer = load_local_model(local_model_path)
-                        model_id_for_benchmark = os.path.basename(local_model_path)
-                    else:
-                        socketio.emit("status", {
-                            "type": "error",
-                            "message": "No model available. Provide a HF repo or upload a model."
-                        }, to=upload_id)
-                        return
-
-                    # 3) Prune to requested threshold
-                    pruned_model, model_info = disable_low_weight_neurons(model, threshold)
-
-                    # 4) Time a *real* evaluation + optional GPU power sampling
-                    socketio.emit("status", {"message": "Running real benchmark..."}, to=upload_id)
-                    stop_evt = threading.Event()
-                    power_readings, power_thread = sample_gpu_power_background(stop_evt, interval=0.25)
-
-                    t0 = time.perf_counter()
-                    real_metrics = evaluate_model(pruned_model, tokenizer, df)  # your existing evaluator
-                    elapsed = time.perf_counter() - t0
-                    stop_evt.set()
-                    power_thread.join(timeout=0.5)
-
-                    # Aggregate power (if any)
-                    avg_watts = sum(power_readings) / len(power_readings) if power_readings else None
-                    energy_j = (avg_watts * elapsed) if avg_watts is not None else None
-
-                    # 5) Merge into benchmark_data.json (append 'realBenchmark')
-                    bench_path = os.path.join(get_upload_path(upload_id), "benchmark_data.json")
-                    base_payload = {}
-                    if os.path.exists(bench_path):
-                        with open(bench_path, "r", encoding="utf-8") as f:
-                            base_payload = json.load(f)
-
-                    base_payload.setdefault("model", model_id_for_benchmark)
-                    base_payload.setdefault("threshold", threshold)
-
-                    base_payload["realBenchmark"] = {
-                        "device": detect_local_device(),
-                        "elapsedSec": elapsed,
-                        "samples": int(len(df)),
-                        "throughputSamplesPerSec": (len(df) / elapsed) if elapsed > 0 else None,
-                        "avgGpuPowerW": avg_watts,       # may be None if NVML unavailable
-                        "energyJoules": energy_j,        # may be None
-                        "metrics": real_metrics.get("overall", {})  # accuracy/precision/recall/f1 from real run
-                    }
-
-                    with open(bench_path, "w", encoding="utf-8") as f:
-                        json.dump(base_payload, f, indent=2)
-
-                    socketio.emit("status", {
-                        "message": "Real benchmark completed",
-                        "type": "complete"
-                    }, to=upload_id)
-
-                except Exception as e:
+                if hf_url:
+                    model, tokenizer = load_huggingface_model(hf_url)
+                    model_id_for_benchmark = hf_url
+                elif local_model_path:
+                    model, tokenizer = load_local_model(local_model_path)
+                    model_id_for_benchmark = os.path.basename(local_model_path)
+                else:
                     socketio.emit("status", {
                         "type": "error",
-                        "message": f"Real benchmark failed: {e}"
+                        "message": "No model available. Provide a HF repo or upload a model."
                     }, to=upload_id)
+                    return
 
-            socketio.start_background_task(process)
+                # 3) Prune to requested threshold
+                pruned_model, model_info = disable_low_weight_neurons(model, threshold)
+
+                # 4) Time a *real* evaluation + optional GPU power sampling
+                socketio.emit("status", {"message": "Running real benchmark..."}, to=upload_id)
+                stop_evt = threading.Event()
+                power_readings, power_thread = sample_gpu_power_background(stop_evt, interval=0.25)
+
+                t0 = time.perf_counter()
+                real_metrics = evaluate_model(pruned_model, tokenizer, df, target_col=target_col)
+                elapsed = time.perf_counter() - t0
+                stop_evt.set()
+                power_thread.join(timeout=0.5)
+
+                # Aggregate power (if any)
+                avg_watts = sum(power_readings) / len(power_readings) if power_readings else None
+                energy_j = (avg_watts * elapsed) if avg_watts is not None else None
+
+                # 5) Merge into benchmark_data.json (append 'realBenchmark')
+                bench_path = os.path.join(get_upload_path(upload_id), "benchmark_data.json")
+                base_payload = {}
+                if os.path.exists(bench_path):
+                    with open(bench_path, "r", encoding="utf-8") as f:
+                        base_payload = json.load(f)
+
+                base_payload.setdefault("model", model_id_for_benchmark)
+                base_payload.setdefault("threshold", threshold)
+
+                base_payload["realBenchmark"] = {
+                    "device": detect_local_device(),
+                    "elapsedSec": elapsed,
+                    "samples": int(len(df)),
+                    "throughputSamplesPerSec": (len(df) / elapsed) if elapsed > 0 else None,
+                    "avgGpuPowerW": avg_watts,       # may be None if NVML unavailable
+                    "energyJoules": energy_j,        # may be None
+                    "metrics": real_metrics.get("overall", {})  # accuracy/precision/recall/f1 from real run
+                }
+
+                with open(bench_path, "w", encoding="utf-8") as f:
+                    json.dump(base_payload, f, indent=2)
+
+                socketio.emit("status", {
+                    "message": "Real benchmark completed",
+                    "type": "complete"
+                }, to=upload_id)
+
+            except Exception as e:
+                socketio.emit("status", {
+                    "type": "error",
+                    "message": f"Real benchmark failed: {e}"
+                }, to=upload_id)
+
+        socketio.start_background_task(process)
 

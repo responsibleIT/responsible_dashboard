@@ -12,17 +12,13 @@ from preprocess import preprocess
 
 try:
     import torch
-except Exception:  # torch is optional at import time
+except Exception:
     torch = None
 
 
-def _infer_label_to_index(y):
-    """
-    Create a deterministic mapping from raw labels -> integer indices.
-    Tries to preserve natural ordering when possible.
-    """
-    # Convert to strings for stable, comparable values
-    uniq = list({str(v) for v in y})
+def _infer_label_to_index(labels):
+    """Deterministic mapping raw_label(str) -> integer index."""
+    uniq = list({str(v) for v in labels})
     try:
         uniq_sorted = sorted(uniq)
     except Exception:
@@ -30,106 +26,71 @@ def _infer_label_to_index(y):
     return {lab: i for i, lab in enumerate(uniq_sorted)}
 
 
-def _ensure_device_tensor(x):
-    if torch is None:
-        return x
-    # No-op: tokenizer already returns tensors on CPU by default.
-    # You can add model.device handling here if needed.
-    return x
-
-
 def evaluate_model(
     model,
     tokenizer,
     df,
-    text_col: str = "text",
-    target_col: str = "label",
-    label_to_index: dict | None = None,
+    *,
+    target_col: str,
+    feature_cols: list[str] | None = None,
+    label_to_index: dict[str, int] | None = None,
 ):
     """
-    Evaluate a text classification model on a dataframe.
+    Evaluate a text classifier using ALL non-target columns as input features.
 
-    Parameters
-    ----------
-    model : transformers.PreTrainedModel (or similar)
-    tokenizer : transformers.PreTrainedTokenizer (or similar)
-    df : pd.DataFrame
-        Must contain at least `text_col` and `target_col`.
-    text_col : str
-        Name of the column containing the input text.
-    target_col : str
-        Name of the column containing the ground-truth label.
-    label_to_index : dict[str, int] | None
-        Optional mapping from raw labels (stringified) to integer indices.
-        If None, a deterministic mapping will be inferred from the data.
-
-    Returns
-    -------
-    dict
-        {
-          0: {accuracy, f1_score, precision, recall},
-          1: {...},
-          ...
-          "overall": {...}
-        }
-        Per-class keys are integer indices (0..K-1) so the caller can
-        map them to display names separately.
+    - target_col: name of the ground-truth label column.
+    - feature_cols: optional explicit list; if None -> all columns except target_col.
+    - label_to_index: optional mapping raw label (as string) -> integer class index.
     """
-    predictions: list[int] = []
-    true_labels: list[int] = []
+    # Which columns feed the text model?
+    if feature_cols is None:
+        feature_cols = [c for c in df.columns if c != target_col]
 
-    # Build mapping if not provided
+    # Stable mapping for metrics keyed by integers (0..K-1)
     if label_to_index is None:
         label_to_index = _infer_label_to_index(df[target_col].tolist())
 
-    # Inverse mapping is used only by the caller (websocket), so we keep
-    # keys here as integer indices.
-    # Note: callers that already renamed columns to 'text'/'label' can
-    # still call this with defaults.
+    predictions: list[int] = []
+    true_labels: list[int] = []
 
-    # Use no-grad for speed/memory
-    use_torch_no_grad = torch is not None and hasattr(torch, "no_grad")
+    use_no_grad = torch is not None and hasattr(torch, "no_grad")
+    null_ctx = (
+        torch.no_grad() if use_no_grad
+        else type("Null", (), {"__enter__": lambda *_: None, "__exit__": lambda *_: False})()
+    )
 
-    iterator = df.itertuples(index=False)
-    if use_torch_no_grad:
-        no_grad_ctx = torch.no_grad()
-    else:
-        # Dummy context manager
-        class _NullCtx:
-            def __enter__(self): return None
-            def __exit__(self, *args): return False
-        no_grad_ctx = _NullCtx()
+    with null_ctx:
+        for _, row in df.iterrows():
+            # Concatenate all non-target features into one string
+            pieces = []
+            for c in feature_cols:
+                val = row[c]
+                if val is None:
+                    continue
+                s = str(val).strip()
+                if s:
+                    pieces.append(s)
+            joined_text = " ".join(pieces)
 
-    with no_grad_ctx:
-        for row in iterator:
-            # Access fields safely by name
-            row_dict = row._asdict() if hasattr(row, "_asdict") else dict(zip(df.columns, row))
-            raw_text = row_dict[text_col]
-            raw_label = row_dict[target_col]
-
-            txt = preprocess(str(raw_text))
-            encoded = tokenizer(txt, return_tensors="pt")
-            encoded = _ensure_device_tensor(encoded)
-
+            # Preprocess + tokenize
+            txt = preprocess(joined_text)
+            encoded = tokenizer(txt, return_tensors="pt", truncation=True)
             output = model(**encoded)
-            # a) transformers logits -> output.logits
-            # b) generic tuple -> output[0]
+
             logits = getattr(output, "logits", None)
             if logits is None:
                 logits = output[0]
-            # batch size is 1; take [0]
             scores = logits[0].detach().cpu().numpy()
             probs = softmax(scores)
-
             pred_idx = int(np.argmax(probs))
             predictions.append(pred_idx)
 
-            # map true label to index (stringify for mapping key)
-            tl = label_to_index.get(str(raw_label))
+            # map true label to index
+            raw_label = str(row[target_col])
+            tl = label_to_index.get(raw_label)
             if tl is None:
-                # unseen label at eval time — extend mapping consistently
                 tl = len(label_to_index)
-                label_to_index[str(raw_label)] = tl
+                label_to_index[raw_label] = tl
             true_labels.append(int(tl))
 
     # Overall metrics
@@ -145,9 +106,7 @@ def evaluate_model(
         cls_true = [1 if y == idx else 0 for y in true_labels]
         cls_pred = [1 if p == idx else 0 for p in predictions]
 
-        # For single-class binarized vectors:
         cls_acc = accuracy_score(cls_true, cls_pred)
-        # Use binary f1/precision/recall per class to avoid weighted-by-support
         cls_f1 = f1_score(cls_true, cls_pred, zero_division=0)
         cls_prec = precision_score(cls_true, cls_pred, zero_division=0)
         cls_rec = recall_score(cls_true, cls_pred, zero_division=0)

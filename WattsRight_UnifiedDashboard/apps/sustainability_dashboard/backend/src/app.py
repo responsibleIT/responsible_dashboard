@@ -59,7 +59,6 @@ socketio = SocketIO(
 # Register websocket handlers
 websocket_handlers(socketio)
 
-
 # ---- frontend ----
 @app.route("/")
 def serve_frontend():
@@ -70,7 +69,6 @@ def serve_frontend():
         "Frontend not bundled (index.html missing). Check Angular build output.",
         500,
     )
-
 
 # ---- optional: save target column after upload (JSON body) ----
 @app.post("/save_columns")
@@ -146,7 +144,6 @@ def upload_data():
 
     # IMPORTANT: return the id the frontend needs
     return jsonify({"upload_id": subdirectory}), 200
-
 
 # ---- settings ----
 @app.get("/settings")
