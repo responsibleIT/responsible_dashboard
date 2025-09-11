@@ -9,7 +9,7 @@ import {NgIf} from '@angular/common';
     NgIf
   ],
   templateUrl: './form-input-text.component.html',
-  styleUrl: './form-input-text.component.scss'
+  styleUrls: ['./form-input-text.component.scss']
 })
 export class FormInputTextComponent {
 

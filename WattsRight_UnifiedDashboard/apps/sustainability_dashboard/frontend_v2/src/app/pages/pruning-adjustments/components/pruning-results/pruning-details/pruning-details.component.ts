@@ -9,7 +9,7 @@ import {PRUNING_TABS} from '@app/constants/pruning.constants';
     NgForOf
   ],
   templateUrl: './pruning-details.component.html',
-  styleUrl: './pruning-details.component.scss'
+  styleUrls: ['./pruning-details.component.scss']
 })
 export class PruningDetailsComponent {
 

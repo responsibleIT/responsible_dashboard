@@ -1,0 +1,20 @@
+{
+  "model": "sureshs/distilbert-large-sms-spam",
+  "threshold": 2.9,
+  "gpu": "NVIDIA GeForce RTX 3060",
+  "location": "france",
+  "realBenchmark": {
+    "device": "NVIDIA GeForce RTX 3060",
+    "elapsedSec": 16.11383819999901,
+    "samples": 1000,
+    "throughputSamplesPerSec": 62.05846103134271,
+    "avgGpuPowerW": 26.403725490196077,
+    "energyJoules": 425.4653604262091,
+    "metrics": {
+      "accuracy": 0.957,
+      "f1_score": 0.9569275952876787,
+      "precision": 0.9600936698359771,
+      "recall": 0.957
+    }
+  }
+}

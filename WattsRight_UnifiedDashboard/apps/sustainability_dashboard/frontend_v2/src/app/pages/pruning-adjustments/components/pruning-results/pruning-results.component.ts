@@ -15,7 +15,7 @@ import {PruningClassPerformance, PruningMetricCardList, PruningTab} from '@app/t
     PruningChartsComponent,
   ],
   templateUrl: './pruning-results.component.html',
-  styleUrl: './pruning-results.component.scss'
+  styleUrls: ['./pruning-results.component.scss']
 })
 export class PruningResultsComponent implements OnInit {
 

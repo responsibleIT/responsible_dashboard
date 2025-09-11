@@ -16,7 +16,7 @@ import {AsyncPipe} from '@angular/common';
     AsyncPipe
   ],
   templateUrl: './benchmark-metric-cards.component.html',
-  styleUrl: './benchmark-metric-cards.component.scss'
+  styleUrls: ['./benchmark-metric-cards.component.scss']
 })
 export class BenchmarkMetricCardsComponent {
 

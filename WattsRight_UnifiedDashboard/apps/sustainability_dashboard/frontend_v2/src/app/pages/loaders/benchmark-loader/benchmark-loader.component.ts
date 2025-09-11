@@ -4,12 +4,14 @@ import { Subscription } from 'rxjs';
 import { Router } from '@angular/router';
 import { WebsocketService } from '@app/services/websocket.service';
 import { SettingsService } from '@app/services/settings.service';
+import { UploadService } from '@app/services/upload.service';
 
 @Component({
   selector: 'app-benchmark-loader',
+  standalone: true,
   imports: [ButtonDirective],
   templateUrl: './benchmark-loader.component.html',
-  styleUrl: './benchmark-loader.component.scss'
+  styleUrls: ['./benchmark-loader.component.scss']
 })
 export class BenchmarkLoaderComponent implements OnInit, OnDestroy {
   @ViewChild('progressCircle', { static: true }) progressCircle!: ElementRef;
@@ -20,56 +22,58 @@ export class BenchmarkLoaderComponent implements OnInit, OnDestroy {
   constructor(
     private readonly router: Router,
     private readonly websocketService: WebsocketService,
-    private readonly settingsService: SettingsService
+    private readonly uploadService: UploadService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   ngOnInit() {
+    // 1. Resolve upload_id from (a) query param, (b) UploadService, (c) localStorage via UploadService
+    const fromQuery = this.router.parseUrl(this.router.url).queryParams['upload_id'];
+    const uploadId = fromQuery
+      || this.uploadService?.uploadIdValue     // preferred
+      || null;
+
+    if (!uploadId) {
+      console.error('[benchmark-loader] Missing upload_id, going back to start');
+      this.router.navigate(['/']);
+      return;
+    }
+
+    // 2. Open websocket with explicit id (this sets internal state inside the service)
+    this.websocketService.connect(uploadId);
+
+    // 3. Pull the other settings (they should already be set earlier in the flow)
     const threshold = this.settingsService.Threshold;
     const gpu = this.settingsService.Gpu;
     const location = this.settingsService.Location;
 
-    const uploadId = this.websocketService.getUploadId() || 'benchmark';
-    this.websocketService.connect(uploadId);
-
-    // When connected, send the *real* benchmark command
+    // 4. Subscribe to connection + send command
     this.subscription.add(
       this.websocketService.getConnectionStatus().subscribe(status => {
         if (status === 'connected') {
-          // small delay to ensure the room join finished
           setTimeout(() => {
             this.websocketService.sendMessage({
               event: 'benchmark_real',
-              data: {
-                upload_id: uploadId,
-                threshold: threshold,
-                gpu: gpu,           // optional (backend ignores if not needed)
-                location: location  // optional
-              }
+              data: { upload_id: uploadId, threshold, gpu, location }
             });
-          }, 300);
-        } else if (status === 'disconnected') {
-          console.log('WebSocket disconnected');
-        } else if (status === 'error') {
-          console.error('WebSocket error occurred');
+          }, 200);
         }
       })
     );
 
-    // Listen for backend progress/completion
+    // 5. Listen for messages
     this.subscription.add(
-      this.websocketService.getMessages().subscribe(message => {
-        // backend sends: emit("status", {"message": "...", "type": "complete" | "error" | "loading"})
-        if (message.type === 'complete') {
-          this.message = message.message;
-          this.websocketService.disconnect();
+      this.websocketService.getMessages().subscribe(msg => {
+        if (msg.type === 'loading' && msg.message) {
+          this.message = msg.message;
+        } else if (msg.type === 'complete') {
+          this.message = msg.message || 'Benchmark complete.';
           setTimeout(() => {
-            this.router.navigateByUrl('/benchmark-results', { replaceUrl: true });
-          }, 800);
-        } else if (message.type === 'loading') {
-          this.message = message.message;
-        } else if (message.type === 'error') {
-          this.message = message.message || 'Benchmark failed';
-          console.error('[benchmark_real] error:', message);
+            this.router.navigate(['/benchmark-results'], {
+              replaceUrl: true,
+              queryParams: { upload_id: uploadId }
+            });
+          }, 300);
         }
       })
     );

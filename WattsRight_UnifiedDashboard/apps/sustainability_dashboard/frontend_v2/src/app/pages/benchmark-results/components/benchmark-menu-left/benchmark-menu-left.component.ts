@@ -18,7 +18,7 @@ import {BenchmarkData} from '@app/types/pruning.types';
     TitleCasePipe
   ],
   templateUrl: './benchmark-menu-left.component.html',
-  styleUrl: './benchmark-menu-left.component.scss'
+  styleUrls: ['./benchmark-menu-left.component.scss']
 })
 export class BenchmarkMenuLeftComponent {
 

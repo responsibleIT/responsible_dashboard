@@ -12,7 +12,7 @@ import {UploadModal} from '@app/pages/landing-page/modals/upload/upload.modal';
     ButtonDirective
   ],
   templateUrl: './landing-page.component.html',
-  styleUrl: './landing-page.component.scss'
+  styleUrls: ['./landing-page.component.scss']
 })
 export class LandingPageComponent {
 

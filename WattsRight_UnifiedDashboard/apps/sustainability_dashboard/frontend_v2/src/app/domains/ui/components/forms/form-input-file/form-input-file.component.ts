@@ -8,7 +8,7 @@ import { NgIf } from '@angular/common';
   standalone: true,
   imports: [FormsModule, ReactiveFormsModule, NgIf],
   templateUrl: './form-input-file.component.html',
-  styleUrl: './form-input-file.component.scss',
+  styleUrls: ['./form-input-file.component.scss'],
 })
 export class FormInputFileComponent {
   public readonly id = `file-upload-${Math.random().toString(36).slice(2)}`;

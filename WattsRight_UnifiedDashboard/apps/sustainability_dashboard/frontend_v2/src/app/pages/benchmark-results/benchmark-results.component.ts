@@ -1,126 +1,133 @@
-import {ChangeDetectorRef, Component, HostListener, OnInit} from '@angular/core';
-import {
-  BenchmarkMenuLeftComponent
-} from '@app/pages/benchmark-results/components/benchmark-menu-left/benchmark-menu-left.component';
-import {
-  BenchmarkDetailsComponent
-} from '@app/pages/benchmark-results/components/benchmark-details/benchmark-details.component';
-import {BenchmarkService} from '@app/services/benchmark.service';
-import {Router} from '@angular/router';
-import {BehaviorSubject, firstValueFrom} from 'rxjs';
-import {BenchmarkData, BenchmarkMetricCardList, ClassPerformance} from '@app/types/pruning.types';
-import {UploadService} from '@app/services/upload.service';
-import {AsyncPipe} from '@angular/common';
-import { SettingsService } from '@app/services/settings.service';
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { UploadService } from '@app/services/upload.service';
+import { BenchmarkService } from '@app/services/benchmark.service';
+import { CommonModule } from '@angular/common';
+import { WebsocketService } from '@app/services/websocket.service';
+
+type Pair = { orig: number | null; pruned: number | null };
 
 @Component({
   selector: 'app-benchmark-results',
-  imports: [
-    BenchmarkMenuLeftComponent,
-    BenchmarkDetailsComponent,
-    AsyncPipe,
-  ],
+  standalone: true,
+  imports: [CommonModule], // CommonModule covers NgIf, NgFor, number pipe
   templateUrl: './benchmark-results.component.html',
-  styleUrl: './benchmark-results.component.scss'
+  styleUrls: ['./benchmark-results.component.scss']
 })
 export class BenchmarkResultsComponent implements OnInit {
+  cards: { power: Pair; performance: Pair; emissions: Pair; compute: Pair } = {
+    power: { orig: null, pruned: null },
+    performance: { orig: null, pruned: null },
+    emissions: { orig: null, pruned: null },
+    compute: { orig: null, pruned: null }
+  };
 
-  private uploadId: string | null;
+  modelName = '—';
+  gpuLabel  = '—';
+  locationLabel = '—';
+  thresholdPct: number | null = null;
+  sizeReductionPct: number | null = null; // (1 - pruned/original) * 100 when data available
 
-  public isMobileMenuOpen = false;
-  public benchmarkData: BenchmarkData | undefined;
-  public metricCards$ = new BehaviorSubject<BenchmarkMetricCardList | null>(null);
-  public classPerformances$ = new BehaviorSubject<ClassPerformance[]>([]);
+  classes: Array<{
+    name: string;
+    overallAcc: number;
+    deltaAcc: number;
+    f1: Pair; precision: Pair; recall: Pair; accuracy: Pair;
+  }> = [];
 
   constructor(
-    private cdr: ChangeDetectorRef,
+    private readonly uploads: UploadService,
+    private readonly benchmark: BenchmarkService,
     private readonly router: Router,
-    private readonly benchmarkService: BenchmarkService,
-    private readonly uploadService: UploadService,
-    private readonly settingsService: SettingsService,
-  ) {
-  }
+    private readonly route: ActivatedRoute,
+    private readonly ws: WebsocketService,
+  ) {}
 
-  ngOnInit() {
-    this.uploadId = this.uploadService.uploadIdValue;
+  ngOnInit(): void {
+    const qid  = this.route.snapshot.queryParamMap.get('upload_id');
+    // 👇 ensure this matches your service naming
+    const svcId = (this.uploads as any).upload_id?.value ?? (this.uploads as any).upload_id?.value ?? null;
+    const wsId  = this.ws.getUploadId() ?? null;
 
-    if (!this.uploadId) {
-      this.router.navigate(['/']);
+    const upload_id = qid ?? svcId ?? wsId;
+
+    console.log('[BenchmarkResults] resolved upload_id sources', { qid, svcId, wsId, chosen: upload_id });
+
+    if (!upload_id) {
+      console.error('[results] missing upload_id');
+      this.router.navigateByUrl('/');
+      return;
     }
 
-    firstValueFrom(this.benchmarkService.fetchData(this.uploadId!)).then(data => {
-      this.settingsService.Gpu = data.gpu;
-      this.benchmarkData = data
-
-      const newMetricCards: BenchmarkMetricCardList = {
-        'power': {
-          title: 'Power (per 1000 calls)',
-          unit: 'kWh',
-          original: data.metricCards.power.original,
-          pruned: data.metricCards.power.pruned,
-          change: (data.metricCards.power.pruned - data.metricCards.power.original) / data.metricCards.power.original * 100
-        },
-        'performance': {
-          title: 'Accuracy',
-          unit: '%',
-          original: data.metricCards.performance.original,
-          pruned: data.metricCards.performance.pruned,
-          change: data.metricCards.performance.pruned - data.metricCards.performance.original / data.metricCards.performance.original * 100
-        },
-        'emissions': {
-          title: 'Carbon (per 1000 calls)',
-          unit: 'gCO2',
-          original: data.metricCards.emissions.original,
-          pruned: data.metricCards.emissions.pruned,
-          change: (data.metricCards.emissions.pruned - data.metricCards.emissions.original) / data.metricCards.emissions.original * 100
-        },
-        'compute': {
-          title: 'Computing Power',
-          unit: 'TFLOPS',
-          original: data.metricCards.compute.original,
-          pruned: data.metricCards.compute.pruned,
-          change: (data.metricCards.compute.pruned - data.metricCards.compute.original) / data.metricCards.compute.original * 100
-        }
+    this.benchmark.fetchData(upload_id).subscribe({
+      next: (res: any) => this.hydrate(res),
+      error: (err) => {
+        console.error('[results] fetch error', err);
+        this.router.navigateByUrl('/');
       }
-
-      this.metricCards$.next(newMetricCards);
-
-      let classPerformances: ClassPerformance[] = [];
-      if (data.perClass) {
-        classPerformances = Object.entries(data.perClass).map(([className, performance]) => ({
-          className,
-          performance: performance
-        }));
-      }
-      this.classPerformances$.next(classPerformances);
     });
   }
 
-  toggleMobileMenu() {
-    this.isMobileMenuOpen = !this.isMobileMenuOpen;
+  private hydrate(res: any): void {
+    this.modelName = res?.model ?? '—';
+    this.gpuLabel  = res?.gpu ?? '—';
+    this.locationLabel = res?.location ?? '—';
+    this.thresholdPct = typeof res?.threshold === 'number' ? Number(res.threshold) : null;
 
-    if (window.innerWidth <= 768) {
-      if (this.isMobileMenuOpen) {
-        document.body.style.overflow = 'hidden';
-      } else {
-        document.body.style.overflow = '';
-      }
+    const mc = res?.metricCards ?? {};
+    const pick = (k: string): Pair => ({ orig: this.n(mc?.[k]?.original), pruned: this.n(mc?.[k]?.pruned) });
+
+    this.cards.power       = pick('power');
+    this.cards.performance = pick('performance');
+    this.cards.emissions   = pick('emissions');
+    this.cards.compute     = pick('compute');
+
+    // compute size reduction percentage (based on compute or power if compute absent)
+    const baseOrig = this.cards.compute.orig ?? this.cards.power.orig;
+    const basePruned = this.cards.compute.pruned ?? this.cards.power.pruned;
+    if (typeof baseOrig === 'number' && baseOrig > 0 && typeof basePruned === 'number') {
+      this.sizeReductionPct = (1 - (basePruned / baseOrig)) * 100;
+    } else {
+      this.sizeReductionPct = null;
     }
+
+    const cl = res?.classMetrics ?? {};
+    this.classes = Array.isArray(cl?.items) ? cl.items.map((it: any) => ({
+      name: String(it?.name ?? 'Class'),
+      overallAcc: this.n(it?.accuracy) ?? 0,
+      deltaAcc:   this.n(it?.deltaAccuracy) ?? 0,
+      f1:         { orig: this.n(it?.f1?.original),        pruned: this.n(it?.f1?.pruned) },
+      precision:  { orig: this.n(it?.precision?.original), pruned: this.n(it?.precision?.pruned) },
+      recall:     { orig: this.n(it?.recall?.original),     pruned: this.n(it?.recall?.pruned) },
+      accuracy:   { orig: this.n(it?.accuracyOriginal),     pruned: this.n(it?.accuracyPruned) }
+    })) : [];
   }
 
-  @HostListener('window:resize', ['$event'])
-  onResize(event: any) {
-    if (event.target.innerWidth > 768 && this.isMobileMenuOpen) {
-      this.isMobileMenuOpen = false;
-      document.body.style.overflow = ''; // Reset body scroll
-    }
+  // helpers
+  n(v: unknown): number | null {
+    return (typeof v === 'number' && isFinite(v)) ? v : null;
+  }
+  hasPair(p: Pair): boolean {
+    return typeof p.orig === 'number' || typeof p.pruned === 'number';
+  }
+  asSci(v: number | null, unit = ''): string {
+    if (v === null) return '0.00e+0';
+    const exp = v === 0 ? 0 : Math.floor(Math.log10(Math.abs(v)));
+    const mant = v / Math.pow(10, exp);
+    return `${mant.toFixed(2)}e${exp >= 0 ? '+' : ''}${exp}${unit ? ' ' + unit : ''}`;
+  }
+  asPct(v: number | null): string {
+    if (v === null) return '0.0 %';
+    return `${v.toFixed(1)} %`;
+  }
+  deltaPct(orig: number | null, pruned: number | null): string {
+    if (orig === null || pruned === null) return '→ 0.0%';
+    const d = ((pruned - orig) / Math.max(Math.abs(orig), 1e-12)) * 100;
+    const arrow = d >= 0 ? '↑' : '↓';
+    return `${arrow} ${Math.abs(d).toFixed(1)}%`;
   }
 
-  @HostListener('document:keydown.escape', ['$event'])
-  onEscapeKey(event: KeyboardEvent) {
-    if (this.isMobileMenuOpen) {
-      this.toggleMobileMenu();
-    }
+  goBack(): void {
+    this.router.navigateByUrl('/pruning-adjustments');
   }
-
 }

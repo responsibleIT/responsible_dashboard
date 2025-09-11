@@ -15,7 +15,7 @@ import {AsyncPipe, DecimalPipe, NgIf, UpperCasePipe} from '@angular/common';
   ],
   providers: [DecimalPipe],
   templateUrl: './metric-card.component.html',
-  styleUrl: './metric-card.component.scss'
+  styleUrls: ['./metric-card.component.scss']
 })
 export class MetricCardComponent {
 

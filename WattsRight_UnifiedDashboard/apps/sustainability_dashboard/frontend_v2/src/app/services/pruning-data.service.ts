@@ -23,8 +23,8 @@ export class PruningDataService {
     )
   }
 
-  public fetchData(uploadId: string, gpu: string, location: string, metric: string): Observable<PruningPlaygroundData> {
-    return this.http.get(`${this.apiUrl}/chart-data/${uploadId}/${gpu}/${location}`).pipe(
+  public fetchData(upload_id: string, gpu: string, location: string, metric: string): Observable<PruningPlaygroundData> {
+    return this.http.get(`${this.apiUrl}/chart-data/${upload_id}/${gpu}/${location}`).pipe(
       map(response => response as PruningPlaygroundData),
       catchError(error => throwError(() => new Error('Error fetching playground data: ' + error.message)))
     )

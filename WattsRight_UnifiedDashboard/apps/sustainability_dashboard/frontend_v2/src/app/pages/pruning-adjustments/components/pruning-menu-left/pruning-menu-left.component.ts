@@ -18,7 +18,7 @@ import {SettingsService} from '@app/services/settings.service';
     UpperCasePipe
   ],
   templateUrl: './pruning-menu-left.component.html',
-  styleUrl: './pruning-menu-left.component.scss'
+  styleUrls: ['./pruning-menu-left.component.scss']
 })
 export class PruningMenuLeftComponent {
 

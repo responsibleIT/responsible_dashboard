@@ -14,7 +14,7 @@ import {AsyncPipe, UpperCasePipe} from '@angular/common';
     UpperCasePipe
   ],
   templateUrl: './pruning-charts.component.html',
-  styleUrl: './pruning-charts.component.scss'
+  styleUrls: ['./pruning-charts.component.scss']
 })
 export class PruningChartsComponent {
 

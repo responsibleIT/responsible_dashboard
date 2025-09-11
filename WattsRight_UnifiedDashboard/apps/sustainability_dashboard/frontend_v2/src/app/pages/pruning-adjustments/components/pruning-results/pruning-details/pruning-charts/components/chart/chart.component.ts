@@ -10,7 +10,7 @@ import {NgStyle} from '@angular/common';
     NgStyle
   ],
   templateUrl: './chart.component.html',
-  styleUrl: './chart.component.scss'
+  styleUrls: ['./chart.component.scss']
 })
 export class ChartComponent implements OnInit, OnChanges, AfterViewInit, OnDestroy {
 

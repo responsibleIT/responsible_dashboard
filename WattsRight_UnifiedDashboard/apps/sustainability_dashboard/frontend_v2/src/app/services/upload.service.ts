@@ -11,7 +11,7 @@ export class UploadService {
   private readonly apiUrl = `${environment.api.schema}://${environment.api.hostname}`;
 
   // Existing subjects
-  public uploadId = new BehaviorSubject<string | null>(null);
+  public upload_id = new BehaviorSubject<string | null>(null);
   public huggingFaceUrl = new BehaviorSubject<string | null>(null);
   public h5ModelFilename = new BehaviorSubject<string | null>(null);
 
@@ -23,15 +23,15 @@ export class UploadService {
   public selectedMetric = new BehaviorSubject<string | null>(null);
 
   constructor(private http: HttpClient) {
-    this.uploadId = new BehaviorSubject<string | null>(this.loadUploadIdFromLocalStorage());
+    this.upload_id = new BehaviorSubject<string | null>(this.loadUploadIdFromLocalStorage());
   }
 
   // ----- persistence helpers -----
   private loadUploadIdFromLocalStorage(): string | null {
-    const storedUploadId = localStorage.getItem('uploadId');
+    const storedUploadId = localStorage.getItem('upload_id');
     if (storedUploadId) {
       // initialize subject and return
-      this.uploadId.next(storedUploadId);
+      this.upload_id.next(storedUploadId);
       return storedUploadId;
     }
     return null;
@@ -39,9 +39,9 @@ export class UploadService {
 
   private saveUploadIdToLocalStorage(id: string | null): void {
     if (id) {
-      localStorage.setItem('uploadId', id);
+      localStorage.setItem('upload_id', id);
     } else {
-      localStorage.removeItem('uploadId');
+      localStorage.removeItem('upload_id');
     }
   }
 
@@ -54,9 +54,9 @@ export class UploadService {
   }
 
   // ----- setters (keep PascalCase names so your component code compiles) -----
-  set UploadId(uploadId: string | null) {
-    this.uploadId.next(uploadId);
-    this.saveUploadIdToLocalStorage(uploadId);
+  set UploadId(upload_id: string | null) {
+    this.upload_id.next(upload_id);
+    this.saveUploadIdToLocalStorage(upload_id);
   }
 
   set HuggingFaceUrl(huggingFaceUrl: string | null) {
@@ -93,7 +93,7 @@ export class UploadService {
   }
 
   get uploadIdValue(): string | null {
-    return this.uploadId.value;
+    return this.upload_id.value;
   }
 
   // NEW: current values (optional helpers)
@@ -103,7 +103,7 @@ export class UploadService {
   get selectedMetricValue(): string | null { return this.selectedMetric.value; }
 
   public clearUploadId(): void {
-    this.uploadId.next(null);
+    this.upload_id.next(null);
     this.saveUploadIdToLocalStorage(null);
   }
 }

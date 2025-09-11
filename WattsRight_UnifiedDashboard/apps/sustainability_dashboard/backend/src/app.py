@@ -54,7 +54,7 @@ app = Flask(__name__, static_folder=STATIC_DIR, static_url_path="")
 CORS(app)
 
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading",
-                    logger=False, engineio_logger=False)
+                    logger=True, engineio_logger=True)
 
 # Register websocket handlers
 websocket_handlers(socketio)
@@ -69,6 +69,40 @@ def serve_frontend():
         "Frontend not bundled (index.html missing). Check Angular build output.",
         500,
     )
+
+# Explicit SPA routes (avoid relying solely on wildcard for common client paths)
+@app.route('/pruning-adjustments')
+@app.route('/loading-upload')
+@app.route('/loading-benchmark')
+@app.route('/benchmark-results')
+def spa_direct_named():
+    idx = os.path.join(app.static_folder or '', 'index.html')
+    if app.static_folder and os.path.exists(idx):
+        return send_from_directory(app.static_folder, 'index.html')
+    return jsonify({"error": "Frontend not bundled"}), 500
+
+
+# ---- SPA fallback (serve Angular index for client-side routes) ----
+@app.route('/<path:subpath>')
+def spa_fallback(subpath: str):
+    """Return index.html for unknown frontend routes so Angular router can handle them.
+
+    Avoid intercepting known API namespaces and websocket paths.
+    """
+    # Known backend prefixes; let them 404 naturally or be handled by their own routes
+    api_prefixes = (
+        'upload', 'benchmark', 'chart-data', 'settings', 'socket.io', 'save_columns'
+    )
+    if subpath.startswith(api_prefixes):
+        # Let API 404 be explicit
+        return jsonify({"error": f"Not found: {subpath}"}), 404
+
+    idx = os.path.join(app.static_folder or '', 'index.html')
+    if app.static_folder and os.path.exists(idx):
+        # Debug trace: useful while diagnosing 404s
+        # print(f"[SPA Fallback] Serving index.html for path: {subpath}")
+        return send_from_directory(app.static_folder, 'index.html')
+    return jsonify({"error": "Frontend not bundled"}), 500
 
 # ---- optional: save target column after upload (JSON body) ----
 @app.post("/save_columns")

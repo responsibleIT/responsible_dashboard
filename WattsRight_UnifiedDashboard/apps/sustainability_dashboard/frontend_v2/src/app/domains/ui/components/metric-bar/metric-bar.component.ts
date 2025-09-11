@@ -11,7 +11,7 @@ import {DecimalPipe, NgClass, NgIf, TitleCasePipe} from '@angular/common';
     NgIf
   ],
   templateUrl: './metric-bar.component.html',
-  styleUrl: './metric-bar.component.scss'
+  styleUrls: ['./metric-bar.component.scss']
 })
 export class MetricBarComponent {
 

@@ -31,10 +31,9 @@ import { environment } from '@env/environment';
     NgIf,
     ReactiveFormsModule,
     UpperCasePipe,
-    TitleCasePipe
   ],
   templateUrl: './upload.modal.html',
-  styleUrl: './upload.modal.scss'
+  styleUrls: ['./upload.modal.scss']
 })
 export class UploadModal implements OnDestroy {
   // Only the target dropdown is needed
@@ -49,12 +48,7 @@ export class UploadModal implements OnDestroy {
     private readonly uploadService: UploadService,
     private readonly websocketService: WebsocketService,
     private readonly http: HttpClient
-  ) {
-    // When dataset changes, read header and populate dropdown
-    this.uploadFormGroup.controls.dataset.valueChanges.subscribe(f => {
-      if (f instanceof File) this.readCsvHeader(f);
-    });
-  }
+  ) {}
 
   // either/or validator for HF URL vs H5 model
   private eitherOrValidator(controlNames: (keyof UploadFormControls)[]) {
@@ -120,12 +114,12 @@ export class UploadModal implements OnDestroy {
     // 🔥 End block
 
     try {
-      const uploadId = await firstValueFrom(
+      const upload_id = await firstValueFrom(
         this.uploadService.uploadData(formData).pipe(map(d => d.upload_id))
       );
 
-      this.websocketService.UploadId = uploadId;
-      this.uploadService.UploadId = uploadId;
+      this.websocketService.UploadId = upload_id;
+      this.uploadService.UploadId = upload_id;
       this.uploadService.HuggingFaceUrl = huggingfaceUrl ?? null;
       this.uploadService.H5ModelFilename = h5ModelFile?.name ?? null;
 
@@ -141,29 +135,57 @@ export class UploadModal implements OnDestroy {
   private readCsvHeader(file: File): void {
     const reader = new FileReader();
     reader.onload = () => {
-      const text = (reader.result as string) ?? '';
-      const firstLine = text.split(/\r?\n/)[0] ?? '';
+      const raw = (reader.result as string) ?? '';
+      if (!raw) { this.csvColumns = []; return; }
 
-      // strip BOM if present
-      const line = firstLine.replace(/^\uFEFF/, '');
+      // Pick the first non-empty line (skip BOM + blank lines)
+      const lines = raw.split(/\r?\n/).map(l => l.replace(/^\uFEFF/, ''));
+      const headerLine = (lines.find(l => l.trim().length > 0) || '').trim();
+      if (!headerLine) { this.csvColumns = []; return; }
 
-      // detect delimiter (comma, semicolon, or tab)
-      const delimiters = [',', ';', '\t'];
-      const best = delimiters
-        .map(d => ({ d, parts: line.split(d).length }))
-        .sort((a, b) => b.parts - a.parts)[0]?.d ?? ',';
+      // Robust delimiter detection ignoring quoted delimiters
+      const candidates = [',', ';', '\t'];
+      const countDelimiter = (delim: string): number => {
+        let inQuotes = false, count = 0;
+        for (let i = 0; i < headerLine.length; i++) {
+          const ch = headerLine[i];
+          if (ch === '"') inQuotes = !inQuotes;
+          else if (!inQuotes && ch === delim) count++;
+        }
+        return count;
+      };
+      const best = candidates
+        .map(d => ({ d, c: countDelimiter(d) }))
+        .sort((a, b) => b.c - a.c)[0]?.d || ',';
 
-      const cols = line
-        .split(best)
-        .map(c => c.trim().replace(/^"(.*)"$/, '$1'))
-        .filter(Boolean);
+      // Split respecting simple quoted fields (no embedded escaped quotes handling needed for headers)
+      const cols: string[] = [];
+      let buf = '', inQuotes = false;
+      for (let i = 0; i < headerLine.length; i++) {
+        const ch = headerLine[i];
+        if (ch === '"') {
+          inQuotes = !inQuotes; // toggle
+        } else if (ch === best && !inQuotes) {
+          cols.push(buf.trim().replace(/^"(.*)"$/, '$1'));
+          buf = '';
+        } else {
+          buf += ch;
+        }
+      }
+      if (buf.length) cols.push(buf.trim().replace(/^"(.*)"$/, '$1'));
 
-      this.csvColumns = cols;
+      const filtered = cols.filter(c => c.length > 0);
+      this.csvColumns = filtered;
 
-      // if current target not valid, reset
-      const tgt = this.uploadFormGroup.controls.targetCol.value;
-      if (!cols.includes(tgt ?? '')) {
-        this.uploadFormGroup.controls.targetCol.setValue(null);
+      const current = this.uploadFormGroup.controls.targetCol.value;
+      if (current) {
+        const match = filtered.find(c => c.toLowerCase() === current.toLowerCase());
+        if (match) {
+          // Normalize exact casing
+          this.uploadFormGroup.controls.targetCol.setValue(match, { emitEvent: false });
+        } else {
+          this.uploadFormGroup.controls.targetCol.setValue(null);
+        }
       }
     };
     reader.readAsText(file);
@@ -172,6 +194,7 @@ export class UploadModal implements OnDestroy {
   ngOnInit(): void {
     this.uploadFormGroup.controls.dataset.valueChanges.subscribe(file => {
       if (file instanceof File) this.readCsvHeader(file);
+      else this.csvColumns = [];
     });
   }
 

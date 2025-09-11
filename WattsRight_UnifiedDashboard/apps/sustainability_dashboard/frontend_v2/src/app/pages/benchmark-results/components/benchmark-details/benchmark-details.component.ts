@@ -16,7 +16,7 @@ import {
     BenchmarkClassesComponent
   ],
   templateUrl: './benchmark-details.component.html',
-  styleUrl: './benchmark-details.component.scss'
+  styleUrls: ['./benchmark-details.component.scss']
 })
 export class BenchmarkDetailsComponent {
 

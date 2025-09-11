@@ -9,7 +9,7 @@ import {DecimalPipe, NgIf, TitleCasePipe} from '@angular/common';
     NgIf
   ],
   templateUrl: './benchmark-metric-bar.component.html',
-  styleUrl: './benchmark-metric-bar.component.scss'
+  styleUrls: ['./benchmark-metric-bar.component.scss']
 })
 export class BenchmarkMetricBarComponent {
 

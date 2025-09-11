@@ -20,7 +20,7 @@ import {
     DecimalPipe,
   ],
   templateUrl: './benchmark-class.component.html',
-  styleUrl: './benchmark-class.component.scss'
+  styleUrls: ['./benchmark-class.component.scss']
 })
 export class BenchmarkClassComponent {
 

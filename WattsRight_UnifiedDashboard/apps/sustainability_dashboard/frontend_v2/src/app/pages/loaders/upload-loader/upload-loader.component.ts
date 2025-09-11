@@ -16,7 +16,7 @@ type WsMsg = { type?: string; message?: string; [k: string]: any };
   standalone: true,
   imports: [ButtonDirective],
   templateUrl: './upload-loader.component.html',
-  styleUrl: './upload-loader.component.scss',
+  styleUrls: ['./upload-loader.component.scss'],
 })
 export class UploadLoaderComponent implements OnInit, OnDestroy {
   public message = 'Uploading…';
@@ -29,15 +29,15 @@ export class UploadLoaderComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    const uploadId = this.uploadService.uploadIdValue;
-    if (!uploadId) {
+    const upload_id = this.uploadService.uploadIdValue;
+    if (!upload_id) {
       // No context — return to start page
       this.router.navigate(['/']);
       return;
     }
 
     // 1) Open socket
-    this.websocketService.connect(uploadId);
+    this.websocketService.connect(upload_id);
 
     // 2) Get a connection-status stream that works for either service shape
     const connection$: Observable<ConnStatus> =
@@ -58,11 +58,11 @@ export class UploadLoaderComponent implements OnInit, OnDestroy {
           // Support both send() and sendMessage()
           const svc: any = this.websocketService;
           if (typeof svc.send === 'function') {
-            svc.send('join',  { uploadId });
-            svc.send('start', { uploadId });
+            svc.send('join',  { upload_id: upload_id });
+            svc.send('start', { upload_id: upload_id });
           } else {
-            svc.sendMessage({ event: 'join',  data: { uploadId } });
-            svc.sendMessage({ event: 'start', data: { uploadId } });
+            svc.sendMessage({ event: 'join',  data: { upload_id: upload_id } });
+            svc.sendMessage({ event: 'start', data: { upload_id: upload_id } });
           }
         })
     );

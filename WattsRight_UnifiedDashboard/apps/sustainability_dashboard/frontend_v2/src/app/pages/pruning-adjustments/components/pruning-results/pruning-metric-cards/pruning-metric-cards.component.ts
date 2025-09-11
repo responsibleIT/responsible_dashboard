@@ -10,7 +10,7 @@ import {PruningMetricCardList} from '@app/types/pruning.types';
     MetricCardComponent,
   ],
   templateUrl: './pruning-metric-cards.component.html',
-  styleUrl: './pruning-metric-cards.component.scss'
+  styleUrls: ['./pruning-metric-cards.component.scss']
 })
 export class PruningMetricCardsComponent {
 

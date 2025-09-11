@@ -11,7 +11,7 @@ import {NgForOf, NgIf, TitleCasePipe} from '@angular/common';
     TitleCasePipe
   ],
   templateUrl: './form-input-select.component.html',
-  styleUrl: './form-input-select.component.scss'
+  styleUrls: ['./form-input-select.component.scss']
 })
 export class FormInputSelectComponent {
 

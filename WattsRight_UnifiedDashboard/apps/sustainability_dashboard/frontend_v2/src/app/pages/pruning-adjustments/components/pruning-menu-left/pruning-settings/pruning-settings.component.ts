@@ -9,7 +9,7 @@ import {PruneSettingsFormGroup} from '@app/types/pruning.types';
     FormInputSelectComponent,
   ],
   templateUrl: './pruning-settings.component.html',
-  styleUrl: './pruning-settings.component.scss'
+  styleUrls: ['./pruning-settings.component.scss']
 })
 export class PruningSettingsComponent {
 

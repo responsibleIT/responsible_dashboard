@@ -17,8 +17,8 @@ export class BenchmarkService {
     private http: HttpClient
   ) { }
 
-  public fetchData(uploadId: string): Observable<BenchmarkData> {
-    return this.http.get(`${this.apiUrl}/benchmark/${uploadId}`).pipe(
+  public fetchData(upload_id: string): Observable<BenchmarkData> {
+    return this.http.get(`${this.apiUrl}/benchmark/${upload_id}`).pipe(
       map(response => response as BenchmarkData),
       catchError(error => throwError(() => new Error('Error fetching benchmark: ' + error.message)))
     )

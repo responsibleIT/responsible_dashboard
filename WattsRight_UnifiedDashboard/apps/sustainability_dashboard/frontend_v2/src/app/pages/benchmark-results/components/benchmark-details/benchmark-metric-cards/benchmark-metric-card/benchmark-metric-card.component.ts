@@ -14,7 +14,7 @@ import {DecimalPipe, JsonPipe, NgIf, UpperCasePipe} from '@angular/common';
   ],
   providers: [DecimalPipe],
   templateUrl: './benchmark-metric-card.component.html',
-  styleUrl: './benchmark-metric-card.component.scss'
+  styleUrls: ['./benchmark-metric-card.component.scss']
 })
 export class BenchmarkMetricCardComponent implements OnChanges {
 

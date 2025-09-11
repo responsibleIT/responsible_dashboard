@@ -190,17 +190,10 @@ def websocket_handlers(socketio):
         elapsed = time.perf_counter() - started_at
         rate = done / elapsed if elapsed > 0 else 0.0
         eta = (total - done) / rate if rate > 0 else None
-        socketio.emit(
-            "status",
-            {
-                "type": "progress",
-                "done": int(done),
-                "total": int(total),
-                "rate": rate,             # samples/sec
-                "eta_sec": eta            # may be None early on
-            },
-            to=upload_id
-        )
+        socketio.emit("status", {
+            "message": f"Evaluating {done}/{total} samples...",
+            "eta": eta
+        }, to=upload_id)
 
     @socketio.on('connect')
     def handle_connect():

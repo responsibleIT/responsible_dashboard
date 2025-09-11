@@ -12,7 +12,7 @@ import {
     BenchmarkMetricBarComponent
   ],
   templateUrl: './benchmark-class-performance.component.html',
-  styleUrl: './benchmark-class-performance.component.scss'
+  styleUrls: ['./benchmark-class-performance.component.scss']
 })
 export class BenchmarkClassPerformanceComponent {
 

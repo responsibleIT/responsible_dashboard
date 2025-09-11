@@ -12,7 +12,7 @@ import {NgForOf} from '@angular/common';
     NgForOf
   ],
   templateUrl: './benchmark-classes.component.html',
-  styleUrl: './benchmark-classes.component.scss'
+  styleUrls: ['./benchmark-classes.component.scss']
 })
 export class BenchmarkClassesComponent {
 

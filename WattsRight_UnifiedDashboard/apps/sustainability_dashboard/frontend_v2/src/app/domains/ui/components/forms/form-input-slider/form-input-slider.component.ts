@@ -7,7 +7,7 @@ import {FormControl, ReactiveFormsModule} from "@angular/forms";
         ReactiveFormsModule
     ],
   templateUrl: './form-input-slider.component.html',
-  styleUrl: './form-input-slider.component.scss'
+  styleUrls: ['./form-input-slider.component.scss']
 })
 export class FormInputSliderComponent {
 

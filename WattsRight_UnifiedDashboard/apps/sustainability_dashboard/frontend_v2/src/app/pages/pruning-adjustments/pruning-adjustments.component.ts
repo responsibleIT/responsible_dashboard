@@ -26,7 +26,7 @@ import {
     PruningMenuLeftComponent,
   ],
   templateUrl: './pruning-adjustments.component.html',
-  styleUrl: './pruning-adjustments.component.scss'
+  styleUrls: ['./pruning-adjustments.component.scss']
 })
 export class PruningAdjustmentsComponent implements OnInit, OnDestroy {
 
@@ -108,7 +108,7 @@ export class PruningAdjustmentsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    if (!this.uploadService.uploadId) {
+    if (!this.uploadService.upload_id) {
       this.router.navigate(['/']);
     }
 
@@ -176,7 +176,7 @@ export class PruningAdjustmentsComponent implements OnInit, OnDestroy {
   }
 
   private loadPruningData(): void {
-    if (!this.uploadService.uploadId.value) return;
+    if (!this.uploadService.upload_id.value) return;
     const gpu = this.settingsFormGroup.controls.gpu.value!;
     const location = this.settingsFormGroup.controls.location.value!;
     const metric = this.settingsFormGroup.controls.metric.value!;
@@ -184,7 +184,7 @@ export class PruningAdjustmentsComponent implements OnInit, OnDestroy {
 
     firstValueFrom(
       this.pruningDataService.fetchData(
-        this.uploadService.uploadId.value!, gpu, location, metric
+        this.uploadService.upload_id.value!, gpu, location, metric
       ).pipe(
         map((data) => {
           if (!data) return { performance:{}, power:{}, emissions:{}, tflops:{} };
