@@ -21,7 +21,7 @@ export class WebsocketService {
   }
 
   private baseUrl(): string {
-    return `${environment.api.schema}://${environment.api.hostname}`;
+    return (window?.location?.origin ?? `${environment.api.schema}://${environment.api.hostname}`);
   }
 
   connect(uploadId: string): void {

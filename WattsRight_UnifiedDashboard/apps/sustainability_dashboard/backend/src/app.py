@@ -217,76 +217,61 @@ def get_chart_data(upload_id, gpu, location):
     })
 
 # ---- benchmark data ----
-@app.route("/benchmark/<upload_id>", methods=["GET"])
+@app.get("/benchmark/<upload_id>")
 def get_benchmark_data(upload_id):
     upload_path = os.path.join(UPLOAD_DIR, upload_id)
     bench_path = os.path.join(upload_path, "benchmark_data.json")
-
     if not os.path.exists(bench_path):
         return jsonify({"error": "Benchmark data not found"}), 404
 
     with open(bench_path, "r", encoding="utf-8") as f:
-        payload = json.load(f)
+        data = json.load(f)
 
-    # Pull “UI chrome” fields
-    model = payload.get("model", "model")
-    threshold = payload.get("threshold", 0)
-    gpu_label = payload.get("gpu") or "Detected GPU"
-    location = payload.get("location") or "france"
+    model     = data.get("model", "model")
+    threshold = data.get("threshold", 0)
+    gpu_label = data.get("gpu") or "Detected GPU"
+    location  = data.get("location") or "france"
+    ci = LOCATION_CARBON_MAPPING.get(location, 300)  # gCO2/kWh
 
-    # Location carbon intensity (gCO2 per kWh)
-    carbon_intensity = LOCATION_CARBON_MAPPING.get(location, 300)
-
-    # ===== Prefer realBenchmark if available =====
-    rb = payload.get("realBenchmark") or {}
-    samples = rb.get("samples")
-    energy_j = rb.get("energyJoules")
-    elapsed = rb.get("elapsedSec")
+    rb = data.get("realBenchmark") or {}
+    samples   = rb.get("samples")
+    energy_j  = rb.get("energyJoules")
+    elapsed   = rb.get("elapsedSec")
     avg_watts = rb.get("avgGpuPowerW")
-    throughput = rb.get("throughputSamplesPerSec")
-    real_overall = rb.get("metrics") or {}
+    tput      = rb.get("throughputSamplesPerSec")
+    overall   = rb.get("metrics") or {}
 
-    # Compute “per 1000 calls” from real energy if we can
+    # Power per 1000 calls (prefer total energy)
     kwh_per_1000 = None
     if energy_j and samples and samples > 0:
-        # energy per call [kWh] * 1000
         kwh_per_1000 = (energy_j / samples) / 3_600_000.0 * 1000.0
-    elif avg_watts and throughput and throughput > 0:
-        # energy per call ≈ power / throughput
-        # -> J/call = W / (samples/sec)  => kWh/call = J/3600000
-        kwh_per_call = (avg_watts / throughput) / 3_600_000.0
-        kwh_per_1000 = kwh_per_call * 1000.0
+    elif avg_watts and tput and tput > 0:
+        kwh_per_1000 = ((avg_watts / tput) / 3_600_000.0) * 1000.0
 
-    emissions_per_1000 = (kwh_per_1000 * carbon_intensity) if kwh_per_1000 else None
+    emissions_per_1000 = (kwh_per_1000 * ci) if kwh_per_1000 is not None else None
 
-    # Build metric cards. If we don’t have real numbers, keep them None to avoid NaNs in charts.
-    metric_cards = {
-        "power":      {"original": kwh_per_1000,        "pruned": kwh_per_1000},
-        "emissions":  {"original": emissions_per_1000,  "pruned": emissions_per_1000},
-        # Accuracy expects %, your evaluator returns 0..1
-        "performance":{"original": (real_overall.get("accuracy") or 0) * 100.0,
-                       "pruned":   (real_overall.get("accuracy") or 0) * 100.0},
-        # Compute (TFLOPS) is unknown in a “real” run; leave None
-        "compute":    {"original": None,                "pruned": None},
-    }
-
-    # Final response mirrors what the front-end expects
     resp = {
         "model": model,
-        "gpu": gpu_label,           # <<< stops showing “NVIDIA A100”
+        "gpu": gpu_label,          # <- shows “NVIDIA GeForce RTX 3060” in UI
         "location": location,
         "threshold": threshold,
-        "overall": {                # keep “overall” accuracy accessible too
+        "overall": {
             "accuracy": {
-                "original": (real_overall.get("accuracy") or 0),
-                "pruned":   (real_overall.get("accuracy") or 0),
+                "original": overall.get("accuracy") or 0.0,
+                "pruned":   overall.get("accuracy") or 0.0,
             }
         },
-        "metricCards": metric_cards,
-        # keep realBenchmark visible for any UI “drilldown”
+        "metricCards": {
+            "power":      {"original": kwh_per_1000,       "pruned": kwh_per_1000},
+            "emissions":  {"original": emissions_per_1000, "pruned": emissions_per_1000},
+            "performance":{"original": (overall.get("accuracy") or 0.0) * 100.0,
+                           "pruned":   (overall.get("accuracy") or 0.0) * 100.0},
+            "compute":    {"original": None,               "pruned": None},  # unknown
+        },
         "realBenchmark": rb
     }
     return jsonify(resp)
+
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
