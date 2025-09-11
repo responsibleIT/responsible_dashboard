@@ -1,67 +1,72 @@
-<div class="benchmark-results">
-  <aside class="br-sidebar">
-    <h2 class="br-sidebar__title">Model Benchmark</h2>
-    <div class="br-kv"><span class="k">Model</span><span class="v">{{ modelName }}</span></div>
-    <div class="br-kv"><span class="k">GPU</span><span class="v">{{ gpuLabel }}</span></div>
-    <div class="br-kv"><span class="k">Location</span><span class="v">{{ locationLabel }}</span></div>
-    <div class="br-kv"><span class="k">Threshold</span><span class="v">{{ thresholdPct === null ? '—' : (thresholdPct | number:'1.0-1') + '%' }}</span></div>
-    <div class="br-kv"><span class="k">Size Reduction</span><span class="v">{{ sizeReductionPct === null ? '—' : (sizeReductionPct | number:'1.0-1') + '%' }}</span></div>
-    <div class="br-actions">
-      <button class="br-btn" (click)="goBack()">Change Settings</button>
-      <button class="br-btn br-btn--primary">Export Model</button>
+<div class="br-layout">
+  <!-- LEFT SUMMARY CARD -->
+  <div class="br-summary">
+    <div class="br-summary__header">
+      <div class="br-summary__reduction" *ngIf="sizeReductionPct !== null">
+        <div class="val">{{ sizeReductionPct | number:'1.0-1' }}<span class="pct">%</span></div>
+        <div class="lbl">Size Reduction</div>
+      </div>
+      <div class="br-summary__reduction" *ngIf="sizeReductionPct === null">
+        <div class="val">—</div>
+        <div class="lbl">Size Reduction</div>
+      </div>
     </div>
-  </aside>
+    <div class="br-summary__body">
+      <div class="kv"><span>Original</span><strong>{{ originalParameters === null ? '—' : (originalParameters | number) }}</strong></div>
+      <div class="kv"><span>Pruned</span><strong>{{ prunedParameters === null ? '—' : (prunedParameters | number) }} <span class="delta" *ngIf="sizeReductionPct !== null">({{ sizeReductionPct | number:'1.0-1' }}%)</span></strong></div>
+      <div class="divider"></div>
+      <div class="kv"><span>Model</span><strong>{{ modelName }}</strong></div>
+      <div class="kv"><span>GPU</span><strong>{{ gpuLabel }}</strong></div>
+      <div class="kv"><span>Location</span><strong>{{ locationLabel }}</strong></div>
+      <div class="kv"><span>Threshold</span><strong>{{ thresholdPct === null ? '—' : (thresholdPct | number:'1.0-1') + '%' }}</strong></div>
+      <button class="btn-secondary" (click)="goBack()">Go Back And Change Settings</button>
+      <button class="btn-primary" (click)="exportModel()">Export Model</button>
+    </div>
+  </div>
 
-  <main class="br-main">
-    <section class="br-tiles">
-      <div class="br-tile">
-        <div class="t-label">Power / 1000 calls</div>
-        <div class="t-value">{{ asSci(cards.power.pruned) }} <small>kWh</small></div>
-        <div class="t-sub">{{ deltaPct(cards.power.orig, cards.power.pruned) }} <span class="sep">•</span> Orig: {{ asSci(cards.power.orig) }}</div>
+  <!-- KPI TILES -->
+  <div class="br-content">
+    <div class="br-kpis">
+      <div class="kpi kpi--power">
+        <div class="kpi__label">Power (per 1000 calls)</div>
+        <div class="kpi__value">{{ asSci(cards.power.pruned) }} <span class="unit">kWh</span></div>
+        <div class="kpi__delta">{{ deltaPct(cards.power.orig, cards.power.pruned) }} <span class="orig">Original: {{ asSci(cards.power.orig) }}</span></div>
       </div>
-      <div class="br-tile">
-        <div class="t-label">Accuracy</div>
-        <div class="t-value">{{ asPct(cards.performance.pruned) }}</div>
-        <div class="t-sub">{{ deltaPct(cards.performance.orig, cards.performance.pruned) }} <span class="sep">•</span> Orig: {{ asPct(cards.performance.orig) }}</div>
+      <div class="kpi kpi--acc">
+        <div class="kpi__label">Accuracy</div>
+        <div class="kpi__value">{{ asPct(cards.performance.pruned) }}</div>
+        <div class="kpi__delta">{{ deltaPct(cards.performance.orig, cards.performance.pruned) }} <span class="orig">Original: {{ asPct(cards.performance.orig) }}</span></div>
       </div>
-      <div class="br-tile">
-        <div class="t-label">Carbon / 1000 calls</div>
-        <div class="t-value">{{ asSci(cards.emissions.pruned) }} <small>gCO₂</small></div>
-        <div class="t-sub">{{ deltaPct(cards.emissions.orig, cards.emissions.pruned) }} <span class="sep">•</span> Orig: {{ asSci(cards.emissions.orig) }}</div>
+      <div class="kpi kpi--carbon">
+        <div class="kpi__label">Carbon (per 1000 calls)</div>
+        <div class="kpi__value">{{ asSci(cards.emissions.pruned) }} <span class="unit">gCO₂</span></div>
+        <div class="kpi__delta">{{ deltaPct(cards.emissions.orig, cards.emissions.pruned) }} <span class="orig">Original: {{ asSci(cards.emissions.orig) }}</span></div>
       </div>
-      <div class="br-tile">
-        <div class="t-label">Compute</div>
-        <div class="t-value">{{ asSci(cards.compute.pruned) }} <small>TFLOPS</small></div>
-        <div class="t-sub">{{ deltaPct(cards.compute.orig, cards.compute.pruned) }} <span class="sep">•</span> Orig: {{ asSci(cards.compute.orig) }}</div>
+      <div class="kpi kpi--compute">
+        <div class="kpi__label">Computing Power</div>
+        <div class="kpi__value">{{ asSci(cards.compute.pruned) }} <span class="unit">TFLOPS</span></div>
+        <div class="kpi__delta">{{ deltaPct(cards.compute.orig, cards.compute.pruned) }} <span class="orig">Original: {{ asSci(cards.compute.orig) }}</span></div>
       </div>
-    </section>
+    </div>
 
-    <section class="br-drilldown" *ngIf="classes.length > 0">
-      <h3 class="br-drilldown__title">Per-Class Metrics</h3>
-      <div class="br-classes">
-        <div class="br-class" *ngFor="let c of classes">
-          <div class="br-class__head">
-            <span class="name">{{ c.name }}</span>
-            <span class="acc">Acc: {{ c.overallAcc | number:'1.0-1' }}% (<span [class.up]="c.deltaAcc >= 0" [class.down]="c.deltaAcc < 0">{{ c.deltaAcc | number:'1.0-2' }}%</span>)</span>
-          </div>
-          <div class="br-metric">
-            <span class="m-label">F1</span>
-            <div class="m-bars"><div class="m-bar orig" [style.width.%]="c.f1.orig ?? 0"></div><div class="m-bar pruned" [style.width.%]="c.f1.pruned ?? 0"></div></div>
-          </div>
-          <div class="br-metric">
-            <span class="m-label">Precision</span>
-            <div class="m-bars"><div class="m-bar orig" [style.width.%]="c.precision.orig ?? 0"></div><div class="m-bar pruned" [style.width.%]="c.precision.pruned ?? 0"></div></div>
-          </div>
-          <div class="br-metric">
-            <span class="m-label">Recall</span>
-            <div class="m-bars"><div class="m-bar orig" [style.width.%]="c.recall.orig ?? 0"></div><div class="m-bar pruned" [style.width.%]="c.recall.pruned ?? 0"></div></div>
-          </div>
-          <div class="br-metric">
-            <span class="m-label">Accuracy</span>
-            <div class="m-bars"><div class="m-bar orig" [style.width.%]="c.accuracy.orig ?? 0"></div><div class="m-bar pruned" [style.width.%]="c.accuracy.pruned ?? 0"></div></div>
+    <!-- CLASSES ACCORDIONS -->
+    <div class="br-classes" *ngIf="classes.length">
+      <div class="br-class" *ngFor="let c of classes">
+        <div class="br-class__summary" (click)="toggleClass(c)">
+          <div class="title">{{ c.name }}</div>
+          <div class="acc">Accuracy: {{ c.overallAcc | number:'1.0-1' }}% <span class="delta" [class.up]="c.deltaAcc >= 0" [class.down]="c.deltaAcc < 0">({{ c.deltaAcc | number:'1.0-2' }}%)</span></div>
+          <div class="icon" [class.open]="c.expanded"></div>
+        </div>
+        <div class="br-class__details" *ngIf="c.expanded">
+          <div class="metric" *ngFor="let m of ['F1','Precision','Recall','Accuracy']; let i = index">
+            <div class="metric__label">{{ m }} Score</div>
+            <div class="metric__bars">
+              <div class="bar bar--orig" [style.width.%]="(m==='F1'?c.f1.orig:(m==='Precision'?c.precision.orig:(m==='Recall'?c.recall.orig:c.accuracy.orig))) || 0"></div>
+              <div class="bar bar--pruned" [style.width.%]="(m==='F1'?c.f1.pruned:(m==='Precision'?c.precision.pruned:(m==='Recall'?c.recall.pruned:c.accuracy.pruned))) || 0"></div>
+            </div>
           </div>
         </div>
       </div>
-    </section>
-  </main>
+    </div>
+  </div>
 </div>

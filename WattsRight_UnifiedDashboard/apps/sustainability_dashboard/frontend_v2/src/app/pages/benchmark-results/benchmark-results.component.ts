@@ -27,12 +27,15 @@ export class BenchmarkResultsComponent implements OnInit {
   locationLabel = '—';
   thresholdPct: number | null = null;
   sizeReductionPct: number | null = null; // (1 - pruned/original) * 100 when data available
+  originalParameters: number | null = null;
+  prunedParameters: number | null = null;
 
   classes: Array<{
     name: string;
     overallAcc: number;
     deltaAcc: number;
     f1: Pair; precision: Pair; recall: Pair; accuracy: Pair;
+    expanded: boolean;
   }> = [];
 
   constructor(
@@ -69,10 +72,14 @@ export class BenchmarkResultsComponent implements OnInit {
   }
 
   private hydrate(res: any): void {
-    this.modelName = res?.model ?? '—';
-    this.gpuLabel  = res?.gpu ?? '—';
-    this.locationLabel = res?.location ?? '—';
-    this.thresholdPct = typeof res?.threshold === 'number' ? Number(res.threshold) : null;
+  this.modelName = res?.model ?? res?.modelName ?? '—';
+  this.gpuLabel  = res?.gpu ?? res?.gpuLabel ?? '—';
+  this.locationLabel = res?.location ?? res?.locationLabel ?? '—';
+  this.thresholdPct = typeof res?.threshold === 'number' ? Number(res.threshold) : (typeof res?.pruningThreshold === 'number' ? Number(res.pruningThreshold) : null);
+
+  // parameter counts if present
+  this.originalParameters = this.n(res?.originalParameters) || this.n(res?.original_params) || null;
+  this.prunedParameters   = this.n(res?.prunedParameters)   || this.n(res?.pruned_params)   || null;
 
     const mc = res?.metricCards ?? {};
     const pick = (k: string): Pair => ({ orig: this.n(mc?.[k]?.original), pruned: this.n(mc?.[k]?.pruned) });
@@ -83,23 +90,29 @@ export class BenchmarkResultsComponent implements OnInit {
     this.cards.compute     = pick('compute');
 
     // compute size reduction percentage (based on compute or power if compute absent)
-    const baseOrig = this.cards.compute.orig ?? this.cards.power.orig;
-    const basePruned = this.cards.compute.pruned ?? this.cards.power.pruned;
-    if (typeof baseOrig === 'number' && baseOrig > 0 && typeof basePruned === 'number') {
-      this.sizeReductionPct = (1 - (basePruned / baseOrig)) * 100;
+    // size reduction: prefer explicit params if available, else fall back to compute/power heuristic
+    if (this.originalParameters && this.prunedParameters && this.originalParameters > 0) {
+      this.sizeReductionPct = (1 - (this.prunedParameters / this.originalParameters)) * 100;
     } else {
-      this.sizeReductionPct = null;
+      const baseOrig = this.cards.compute.orig ?? this.cards.power.orig;
+      const basePruned = this.cards.compute.pruned ?? this.cards.power.pruned;
+      if (typeof baseOrig === 'number' && baseOrig > 0 && typeof basePruned === 'number') {
+        this.sizeReductionPct = (1 - (basePruned / baseOrig)) * 100;
+      } else {
+        this.sizeReductionPct = null;
+      }
     }
 
     const cl = res?.classMetrics ?? {};
-    this.classes = Array.isArray(cl?.items) ? cl.items.map((it: any) => ({
+    this.classes = Array.isArray(cl?.items) ? cl.items.map((it: any, idx: number) => ({
       name: String(it?.name ?? 'Class'),
       overallAcc: this.n(it?.accuracy) ?? 0,
       deltaAcc:   this.n(it?.deltaAccuracy) ?? 0,
       f1:         { orig: this.n(it?.f1?.original),        pruned: this.n(it?.f1?.pruned) },
       precision:  { orig: this.n(it?.precision?.original), pruned: this.n(it?.precision?.pruned) },
       recall:     { orig: this.n(it?.recall?.original),     pruned: this.n(it?.recall?.pruned) },
-      accuracy:   { orig: this.n(it?.accuracyOriginal),     pruned: this.n(it?.accuracyPruned) }
+      accuracy:   { orig: this.n(it?.accuracyOriginal),     pruned: this.n(it?.accuracyPruned) },
+      expanded: idx < 2 // open first two by default
     })) : [];
   }
 
@@ -129,5 +142,14 @@ export class BenchmarkResultsComponent implements OnInit {
 
   goBack(): void {
     this.router.navigateByUrl('/pruning-adjustments');
+  }
+
+  toggleClass(c: any) {
+    c.expanded = !c.expanded;
+  }
+
+  exportModel() {
+    // Placeholder: implement actual export call when backend endpoint available
+    console.log('[BenchmarkResults] Export model clicked');
   }
 }
