@@ -131,7 +131,7 @@ def predict_with_auto_regressive_model(input_pruned_data, performance_metric_key
 
     except Exception as e:
         print(f"Error: {e}")
-        exit()
+        return
 
 
     try:
@@ -151,7 +151,7 @@ def predict_with_auto_regressive_model(input_pruned_data, performance_metric_key
 
     except Exception as e:
         print(f"Error preparing inputs: {e}")
-        exit()
+        return
 
     predicted_intermediate_accuracies_unscaled = predict_auto_regressively_with_acc10(
         model,

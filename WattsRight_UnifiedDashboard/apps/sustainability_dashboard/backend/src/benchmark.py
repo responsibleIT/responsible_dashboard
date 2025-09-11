@@ -1,128 +1,160 @@
-# benchmark.py (drop-in)
-
-import numpy as np
-from scipy.special import softmax
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-    precision_score,
-    recall_score,
-)
-from preprocess import preprocess
-
-try:
-    import torch
-except Exception:
-    torch = None
-
-
-def _infer_label_to_index(labels):
-    """Deterministic mapping raw_label(str) -> integer index."""
-    uniq = list({str(v) for v in labels})
-    try:
-        uniq_sorted = sorted(uniq)
-    except Exception:
-        uniq_sorted = uniq
-    return {lab: i for i, lab in enumerate(uniq_sorted)}
-
-
 def evaluate_model(
     model,
     tokenizer,
     df,
     *,
-    target_col: str,
-    feature_cols: list[str] | None = None,
-    label_to_index: dict[str, int] | None = None,
+    target_col: str = "label",
+    progress_cb=None,
+    batch_size: int = 32,
+    max_rows: int | None = None,
+    max_length: int = 256,
 ):
     """
-    Evaluate a text classifier using ALL non-target columns as input features.
+    Evaluate a text classifier by concatenating ALL columns except `target_col`
+    into a single input string per row.
 
-    - target_col: name of the ground-truth label column.
-    - feature_cols: optional explicit list; if None -> all columns except target_col.
-    - label_to_index: optional mapping raw label (as string) -> integer class index.
+    Args:
+        model, tokenizer: Hugging Face-style model & tokenizer.
+        df (pd.DataFrame): dataset containing the target col + feature cols.
+        target_col (str): name of the target/label column.
+        progress_cb (callable): optional function(done:int, total:int).
+        batch_size (int): batch size for tokenization/inference.
+        max_rows (int|None): evaluate at most this many rows (for speed).
+        max_length (int): tokenizer truncation length.
+
+    Returns:
+        dict: { 'overall': {...}, <class_label>: {...}, ... }
     """
-    # Which columns feed the text model?
-    if feature_cols is None:
-        feature_cols = [c for c in df.columns if c != target_col]
+    # Local imports so this stays drop-in regardless of file-level imports
+    import numpy as np
+    import pandas as pd
+    from scipy.special import softmax
+    from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 
-    # Stable mapping for metrics keyed by integers (0..K-1)
-    if label_to_index is None:
-        label_to_index = _infer_label_to_index(df[target_col].tolist())
+    try:
+        import torch
+        has_torch = True
+    except Exception:
+        torch = None
+        has_torch = False
 
-    predictions: list[int] = []
-    true_labels: list[int] = []
-
-    use_no_grad = torch is not None and hasattr(torch, "no_grad")
-    null_ctx = (
-        torch.no_grad() if use_no_grad
-        else type("Null", (), {"__enter__": lambda *_: None, "__exit__": lambda *_: False})()
-    )
-
-    with null_ctx:
-        for _, row in df.iterrows():
-            # Concatenate all non-target features into one string
-            pieces = []
-            for c in feature_cols:
-                val = row[c]
-                if val is None:
-                    continue
-                s = str(val).strip()
-                if s:
-                    pieces.append(s)
-            joined_text = " ".join(pieces)
-
-            # Preprocess + tokenize
-            txt = preprocess(joined_text)
-            encoded = tokenizer(txt, return_tensors="pt", truncation=True)
-            output = model(**encoded)
-
-            logits = getattr(output, "logits", None)
-            if logits is None:
-                logits = output[0]
-            scores = logits[0].detach().cpu().numpy()
-            probs = softmax(scores)
-            pred_idx = int(np.argmax(probs))
-            predictions.append(pred_idx)
-
-            # map true label to index
-            raw_label = str(row[target_col])
-            tl = label_to_index.get(raw_label)
-            if tl is None:
-                tl = len(label_to_index)
-                label_to_index[raw_label] = tl
-            true_labels.append(int(tl))
-
-    # Overall metrics
-    overall_accuracy = accuracy_score(true_labels, predictions)
-    overall_f1 = f1_score(true_labels, predictions, average="weighted", zero_division=0)
-    overall_precision = precision_score(true_labels, predictions, average="weighted", zero_division=0)
-    overall_recall = recall_score(true_labels, predictions, average="weighted", zero_division=0)
-
-    # Per-class metrics keyed by integer index
-    unique_indices = sorted(set(true_labels))
-    class_metrics: dict[int, dict[str, float]] = {}
-    for idx in unique_indices:
-        cls_true = [1 if y == idx else 0 for y in true_labels]
-        cls_pred = [1 if p == idx else 0 for p in predictions]
-
-        cls_acc = accuracy_score(cls_true, cls_pred)
-        cls_f1 = f1_score(cls_true, cls_pred, zero_division=0)
-        cls_prec = precision_score(cls_true, cls_pred, zero_division=0)
-        cls_rec = recall_score(cls_true, cls_pred, zero_division=0)
-
-        class_metrics[idx] = {
-            "accuracy": cls_acc,
-            "f1_score": cls_f1,
-            "precision": cls_prec,
-            "recall": cls_rec,
+    if df is None or len(df) == 0:
+        # Safe empty result
+        return {
+            'overall': {'accuracy': 0.0, 'f1_score': 0.0, 'precision': 0.0, 'recall': 0.0}
         }
 
-    class_metrics["overall"] = {
-        "accuracy": overall_accuracy,
-        "f1_score": overall_f1,
-        "precision": overall_precision,
-        "recall": overall_recall,
+    # Determine device if torch is present
+    device = "cpu"
+    if has_torch and hasattr(model, "parameters"):
+        try:
+            device = next(model.parameters()).device  # type: ignore[attr-defined]
+        except Exception:
+            device = "cpu"
+
+    total = len(df) if max_rows is None else min(max_rows, len(df))
+
+    # Build texts (concat all non-target columns) and collect labels
+    feature_cols = [c for c in df.columns if c != target_col]
+    texts: list[str] = []
+    labels: list = []
+    for _, row in df.iloc[:total].iterrows():
+        parts = [str(row[c]) for c in feature_cols if pd.notna(row[c])]
+        texts.append(" ".join(parts))
+        labels.append(row[target_col])
+
+    # Preprocess texts (you have a helper already)
+    from preprocess import preprocess
+    texts = [preprocess(t) for t in texts]
+
+    # Inference
+    predictions: list[int] = []
+    if has_torch:
+        model.eval()  # no-op for non-torch
+    done = 0
+
+    # no_grad context only if torch is available
+    no_grad_ctx = torch.no_grad() if has_torch else contextlib.nullcontext()  # type: ignore
+    with no_grad_ctx:
+        for start in range(0, total, batch_size):
+            end = min(start + batch_size, total)
+            batch_texts = texts[start:end]
+
+            # Tokenize (batched)
+            enc = tokenizer(
+                batch_texts,
+                return_tensors="pt" if has_torch else None,
+                padding=True,
+                truncation=True,
+                max_length=max_length,
+            )
+
+            # Move tensors to device if torch available & device != cpu
+            if has_torch and device != "cpu":
+                for k in list(enc.keys()):
+                    try:
+                        enc[k] = enc[k].to(device)  # type: ignore
+                    except Exception:
+                        pass
+
+            # Forward pass
+            outputs = model(**enc)
+            logits = getattr(outputs, "logits", None)
+            if logits is None:
+                # older models return tuple
+                logits = outputs[0]
+
+            # Get numpy logits (CPU)
+            if has_torch:
+                scores = logits.detach().cpu().numpy()
+            else:
+                # If a non-torch model is used, assume numpy already
+                scores = np.array(logits)
+
+            # Softmax & argmax
+            probs = softmax(scores, axis=1)
+            preds = np.argmax(probs, axis=1).tolist()
+            predictions.extend(preds)
+
+            done = end
+            if callable(progress_cb):
+                try:
+                    progress_cb(done, total)
+                except Exception:
+                    pass
+
+    # --- Metrics (overall) ---
+    overall_accuracy = accuracy_score(labels, predictions)
+    overall_f1 = f1_score(labels, predictions, average='weighted', zero_division=0)
+    overall_precision = precision_score(labels, predictions, average='weighted', zero_division=0)
+    overall_recall = recall_score(labels, predictions, average='weighted', zero_division=0)
+
+    metrics: dict = {
+        'overall': {
+            'accuracy': overall_accuracy,
+            'f1_score': overall_f1,
+            'precision': overall_precision,
+            'recall': overall_recall
+        }
     }
 
-    return class_metrics
+    # --- Per-class ---
+    unique_labels = np.unique(labels)
+    for lab in unique_labels:
+        idxs = [i for i, l in enumerate(labels) if l == lab]
+        lab_true = [labels[i] for i in idxs]
+        lab_pred = [predictions[i] for i in idxs]
+
+        m_acc = accuracy_score(lab_true, lab_pred)
+        m_f1 = f1_score(lab_true, lab_pred, average='weighted', zero_division=0)
+        m_prec = precision_score(lab_true, lab_pred, average='weighted', zero_division=0)
+        m_rec = recall_score(lab_true, lab_pred, average='weighted', zero_division=0)
+
+        metrics[lab] = {
+            'accuracy': m_acc,
+            'f1_score': m_f1,
+            'precision': m_prec,
+            'recall': m_rec
+        }
+
+    return metrics

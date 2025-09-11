@@ -11,6 +11,7 @@ import {BehaviorSubject, firstValueFrom} from 'rxjs';
 import {BenchmarkData, BenchmarkMetricCardList, ClassPerformance} from '@app/types/pruning.types';
 import {UploadService} from '@app/services/upload.service';
 import {AsyncPipe} from '@angular/common';
+import { SettingsService } from '@app/services/settings.service';
 
 @Component({
   selector: 'app-benchmark-results',
@@ -36,6 +37,7 @@ export class BenchmarkResultsComponent implements OnInit {
     private readonly router: Router,
     private readonly benchmarkService: BenchmarkService,
     private readonly uploadService: UploadService,
+    private readonly settingsService: SettingsService,
   ) {
   }
 
@@ -47,6 +49,7 @@ export class BenchmarkResultsComponent implements OnInit {
     }
 
     firstValueFrom(this.benchmarkService.fetchData(this.uploadId!)).then(data => {
+      this.settingsService.Gpu = data.gpu;
       this.benchmarkData = data
 
       const newMetricCards: BenchmarkMetricCardList = {

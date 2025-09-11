@@ -20,6 +20,7 @@ import {
 
 @Component({
   selector: 'app-pruning-adjustments',
+  standalone: true,
   imports: [
     PruningResultsComponent,
     PruningMenuLeftComponent,
@@ -33,7 +34,6 @@ export class PruningAdjustmentsComponent implements OnInit, OnDestroy {
   public gpus: { value: string, label: string }[] = [];
   public locations: { value: string, label: string }[] = [];
   public metrics: { value: string, label: string }[] = [];
-
   public activeTab: PruningTab = 'Charts';
   public metricCards: PruningMetricCardList = {
     'power': {
@@ -176,37 +176,34 @@ export class PruningAdjustmentsComponent implements OnInit, OnDestroy {
   }
 
   private loadPruningData(): void {
-    if (!this.uploadService.uploadId.value || !this.settingsFormGroup.controls.gpu.value || !this.settingsFormGroup.controls.location.value || !this.settingsFormGroup.controls.metric.value) {
-      return;
-    }
+    if (!this.uploadService.uploadId.value) return;
+    const gpu = this.settingsFormGroup.controls.gpu.value!;
+    const location = this.settingsFormGroup.controls.location.value!;
+    const metric = this.settingsFormGroup.controls.metric.value!;
+    if (!gpu || !location || !metric) return;
 
     firstValueFrom(
       this.pruningDataService.fetchData(
-        this.uploadService.uploadId.value!,
-        this.settingsFormGroup.controls.gpu.value!,
-        this.settingsFormGroup.controls.location.value!,
-        this.settingsFormGroup.controls.metric.value!
+        this.uploadService.uploadId.value!, gpu, location, metric
       ).pipe(
         map((data) => {
-          const transformKeys = (obj: Record<string, number>) => {
-            const newObj: Record<string, number> = {};
-            Object.entries(obj).forEach(([key, value]) => {
-              const numKey = parseFloat(key);
-              const newKey = numKey % 1 === 0 ? numKey.toString() : key;
-              newObj[newKey] = value;
-            });
-            return newObj;
+          if (!data) return { performance:{}, power:{}, emissions:{}, tflops:{} };
+          const toStrKeys = (obj: Record<string, number>) => {
+            const out: Record<string, number> = {};
+            Object.entries(obj || {}).forEach(([k, v]) => out[String(k)] = Number(v ?? 0));
+            return out;
           };
-
           return {
-            performance: transformKeys(data.performance),
-            power: transformKeys(data.power),
-            emissions: transformKeys(data.emissions),
-            tflops: transformKeys(data.tflops)
+            performance: toStrKeys(data.performance),
+            power: toStrKeys(data.power),
+            emissions: toStrKeys(data.emissions),
+            tflops: toStrKeys(data.tflops),
           };
         }),
       )
     ).then((data) => {
+      console.log('[chart-data]', data); // <— quick sanity log
+
       this.metricCards.performance.values = data.performance;
       this.metricCards.power.values = data.power;
       this.metricCards.emissions.values = data.emissions;
@@ -214,9 +211,12 @@ export class PruningAdjustmentsComponent implements OnInit, OnDestroy {
 
       this.pruningDataService.Data = data;
 
+      // ensure the view updates
+      this.cdr.detectChanges();
+
       this.settingsFormGroup.controls.threshold.setValue(0);
       this.settingsService.Threshold = 0;
-    })
+    });
   }
 
   toggleMobileMenu() {

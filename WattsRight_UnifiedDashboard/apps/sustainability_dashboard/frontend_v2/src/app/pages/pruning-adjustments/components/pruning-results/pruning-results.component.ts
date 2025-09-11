@@ -1,4 +1,4 @@
-import {Component, EventEmitter, Input, Output} from '@angular/core';
+import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
 import {
   PruningMetricCardsComponent
 } from '@app/pages/pruning-adjustments/components/pruning-results/pruning-metric-cards/pruning-metric-cards.component';
@@ -9,6 +9,7 @@ import {PruningClassPerformance, PruningMetricCardList, PruningTab} from '@app/t
 
 @Component({
   selector: 'app-pruning-results',
+  standalone: true,
   imports: [
     PruningMetricCardsComponent,
     PruningChartsComponent,
@@ -16,16 +17,20 @@ import {PruningClassPerformance, PruningMetricCardList, PruningTab} from '@app/t
   templateUrl: './pruning-results.component.html',
   styleUrl: './pruning-results.component.scss'
 })
-export class PruningResultsComponent {
+export class PruningResultsComponent implements OnInit {
 
   @Input() activeTab: PruningTab;
-  @Input() metricCards: PruningMetricCardList
-  @Input() classPerformance: PruningClassPerformance[]
+  @Input() metricCards: PruningMetricCardList;
+  @Input() classPerformance: PruningClassPerformance[];
 
-  @Output() tabChange = new EventEmitter<PruningTab>();
-
-  public onTabChange(tab: PruningTab): void {
-    this.tabChange.emit(tab);
+  ngOnInit() {
+    console.log('[results] mounted'); // probe
   }
+
+  // @Output() tabChange = new EventEmitter<PruningTab>();
+
+  // public onTabChange(tab: PruningTab): void {
+  //   this.tabChange.emit(tab);
+  // }
 
 }

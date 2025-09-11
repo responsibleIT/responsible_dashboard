@@ -9,7 +9,7 @@ MODULE_PKGS = [
     "pandas", "numpy", "scipy", "sklearn", "joblib",
     "flask", "flask_cors", "flask_socketio", "werkzeug",
     "jinja2", "itsdangerous", "click", "markupsafe",
-    "psutil", "engineio", "socketio",
+    "psutil", "engineio", "socketio", "nvidia-ml-py3",
     "setuptools",  # <-- important to satisfy pyi_rth_setuptools
 ]
 
@@ -19,7 +19,7 @@ META_PKGS = [
     "Flask", "Flask-Cors", "Flask-SocketIO", "Werkzeug",
     "Jinja2", "itsdangerous", "click", "MarkupSafe",
     "psutil", "python-engineio", "python-socketio",
-    "setuptools",
+    "setuptools", "nvidia-ml-py3",
 ]
 
 datas = [

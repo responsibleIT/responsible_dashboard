@@ -16,7 +16,8 @@ from demo import BenchmarkDataError, get_benchmark_from_csv
 
 # ---- constants / paths ----
 DEMO_MODE = "false"  # os.getenv("DEMO", "false").lower() == "true"
-UPLOAD_DIR = "uploads"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 GRAPHICSCARD_MAPPING = {
@@ -24,6 +25,10 @@ GRAPHICSCARD_MAPPING = {
     "NVIDIA Tesla V100": {"power": 300, "compute": 15.70},
     "NVIDIA T4": {"power": 70, "compute": 65.00},
 }
+API_PREFIXES = (
+    '/upload', '/save_columns', '/settings', '/chart-data',
+    '/benchmark', '/socket.io'
+)
 LOCATION_CARBON_MAPPING = {"france": 50, "netherlands": 263, "germany": 329}
 PERFORMANCE_METRICS = ["accuracy"]
 
@@ -48,13 +53,8 @@ if not os.path.exists(os.path.join(STATIC_DIR, "index.html")):
 app = Flask(__name__, static_folder=STATIC_DIR, static_url_path="")
 CORS(app)
 
-socketio = SocketIO(
-    app,
-    cors_allowed_origins="*",
-    async_mode="threading",   # simple and works on Windows
-    logger=True,
-    engineio_logger=True,
-)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading",
+                    logger=False, engineio_logger=False)
 
 # Register websocket handlers
 websocket_handlers(socketio)
@@ -113,6 +113,7 @@ def upload_data():
     # create unique upload folder
     subdirectory = f"{int(time.time())}_{random.randint(1000, 9999)}"
     upload_path = os.path.join(UPLOAD_DIR, subdirectory)
+    socketio.emit("status", {"message": f"[UPLOAD DEBUG] Saving upload to: {upload_path}"})
     os.makedirs(upload_path, exist_ok=True)
 
     # persist HF URL
@@ -162,94 +163,144 @@ def get_chart_data(upload_id, gpu, location):
     upload_path = os.path.join(UPLOAD_DIR, upload_id)
     pruned_data_path = os.path.join(upload_path, "pruned_threshold_data.json")
 
+    # If the file isn't there or is malformed, return empty series safely
     if not os.path.exists(pruned_data_path):
-        return jsonify({"error": "Pruned threshold data not found"}), 404
+        return jsonify({
+            "tflops": {},
+            "power": {},
+            "emissions": {},
+            "performance": {}
+        })
 
-    with open(pruned_data_path, "r", encoding="utf-8") as f:
-        pruned_data = json.load(f)
+    try:
+        with open(pruned_data_path, "r", encoding="utf-8") as f:
+            pruned_data = json.load(f) or {}
+    except Exception:
+        return jsonify({
+            "tflops": {},
+            "power": {},
+            "emissions": {},
+            "performance": {}
+        })
 
-    gpu_data = GRAPHICSCARD_MAPPING.get(gpu)
-    carbon_intensity = LOCATION_CARBON_MAPPING.get(location)
+    # Guard against None
+    if pruned_data is None:
+        return jsonify({
+            "tflops": {},
+            "power": {},
+            "emissions": {},
+            "performance": {}
+        })
 
-    tflops_per_threshold = {}
-    power_per_threshold = {}
-    emissions_per_threshold = {}
-    performance_per_threshold = {}
+    # Build the four series. Keys must be strings; values must be numbers.
+    tflops, power, emissions, perf = {}, {}, {}, {}
 
-    for key, data in pruned_data.items():
-        flops = data.get("flops", 0)
-        performance_per_threshold[key] = data.get("accuracy", 0) * 100
-        tflops_per_threshold[key] = flops / 1e12
-        power_per_threshold[key] = calculate_power_consumption(gpu_data, flops)
-        emissions_per_threshold[key] = calculate_emissions(gpu_data, flops, carbon_intensity)
+    # Your GPU/location calculators
+    gpu_data = GRAPHICSCARD_MAPPING.get(gpu) or {"power": 0, "compute": 0}
+    carbon_intensity = LOCATION_CARBON_MAPPING.get(location, 0)
 
-    return jsonify(
-        {
-            "tflops": tflops_per_threshold,
-            "power": power_per_threshold,
-            "emissions": emissions_per_threshold,
-            "performance": performance_per_threshold,
-        }
-    )
+    for k, v in pruned_data.items():
+        key = str(k)  # JSON keys are strings in the frontend anyway
+        flops = v.get("flops", 0.0)
+        performance = v.get("accuracy", 0.0)
 
+        tflops[key] = flops / 1e12
+        power[key] = calculate_power_consumption(gpu_data, flops)
+        emissions[key] = calculate_emissions(gpu_data, flops, carbon_intensity)
+        perf[key] = performance * 100.0
+
+    return jsonify({
+        "tflops": tflops,
+        "power": power,
+        "emissions": emissions,
+        "performance": perf,
+    })
 
 # ---- benchmark data ----
-@app.get("/benchmark/<upload_id>")
+@app.route("/benchmark/<upload_id>", methods=["GET"])
 def get_benchmark_data(upload_id):
     upload_path = os.path.join(UPLOAD_DIR, upload_id)
+    bench_path = os.path.join(upload_path, "benchmark_data.json")
 
-    if DEMO_MODE == "true":
-        flag_path = os.path.join(upload_path, "flag.json")
-        if not os.path.exists(flag_path):
-            return jsonify({"error": "Data not found"}), 404
-
-        with open(flag_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        model = data.get("model", "my-model")
-        threshold = data.get("threshold", 0)
-        gpu = data.get("gpu", "NVIDIA A100")
-        location = data.get("location", "france")
-
-        try:
-            benchmark_data = get_benchmark_from_csv(model, upload_id, threshold, gpu, location)
-            return jsonify(benchmark_data)
-        except BenchmarkDataError as e:
-            return jsonify({"error": str(e)}), e.status_code
-
-    benchmark_data_path = os.path.join(upload_path, "benchmark_data.json")
-    if not os.path.exists(benchmark_data_path):
+    if not os.path.exists(bench_path):
         return jsonify({"error": "Benchmark data not found"}), 404
 
-    with open(benchmark_data_path, "r", encoding="utf-8") as f:
-        benchmark_data = json.load(f)
+    with open(bench_path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
 
-    gpu_data = GRAPHICSCARD_MAPPING.get(benchmark_data.get("gpu"))
-    carbon_intensity = LOCATION_CARBON_MAPPING.get(benchmark_data.get("location"))
+    # Pull “UI chrome” fields
+    model = payload.get("model", "model")
+    threshold = payload.get("threshold", 0)
+    gpu_label = payload.get("gpu") or "Detected GPU"
+    location = payload.get("location") or "france"
 
-    original_flops = benchmark_data.get("originalFlops", 0)
-    pruned_flops = benchmark_data.get("prunedFlops", 0)
+    # Location carbon intensity (gCO2 per kWh)
+    carbon_intensity = LOCATION_CARBON_MAPPING.get(location, 300)
 
-    benchmark_data["metricCards"] = {
-        "power": {
-            "original": calculate_power_consumption(gpu_data, original_flops),
-            "pruned": calculate_power_consumption(gpu_data, pruned_flops),
-        },
-        "performance": {
-            "original": benchmark_data["overall"]["accuracy"]["original"] * 100,
-            "pruned": benchmark_data["overall"]["accuracy"]["pruned"] * 100,
-        },
-        "emissions": {
-            "original": calculate_emissions(gpu_data, original_flops, carbon_intensity),
-            "pruned": calculate_emissions(gpu_data, pruned_flops, carbon_intensity),
-        },
-        "compute": {
-            "original": original_flops / 1e12,
-            "pruned": pruned_flops / 1e12,
-        },
+    # ===== Prefer realBenchmark if available =====
+    rb = payload.get("realBenchmark") or {}
+    samples = rb.get("samples")
+    energy_j = rb.get("energyJoules")
+    elapsed = rb.get("elapsedSec")
+    avg_watts = rb.get("avgGpuPowerW")
+    throughput = rb.get("throughputSamplesPerSec")
+    real_overall = rb.get("metrics") or {}
+
+    # Compute “per 1000 calls” from real energy if we can
+    kwh_per_1000 = None
+    if energy_j and samples and samples > 0:
+        # energy per call [kWh] * 1000
+        kwh_per_1000 = (energy_j / samples) / 3_600_000.0 * 1000.0
+    elif avg_watts and throughput and throughput > 0:
+        # energy per call ≈ power / throughput
+        # -> J/call = W / (samples/sec)  => kWh/call = J/3600000
+        kwh_per_call = (avg_watts / throughput) / 3_600_000.0
+        kwh_per_1000 = kwh_per_call * 1000.0
+
+    emissions_per_1000 = (kwh_per_1000 * carbon_intensity) if kwh_per_1000 else None
+
+    # Build metric cards. If we don’t have real numbers, keep them None to avoid NaNs in charts.
+    metric_cards = {
+        "power":      {"original": kwh_per_1000,        "pruned": kwh_per_1000},
+        "emissions":  {"original": emissions_per_1000,  "pruned": emissions_per_1000},
+        # Accuracy expects %, your evaluator returns 0..1
+        "performance":{"original": (real_overall.get("accuracy") or 0) * 100.0,
+                       "pruned":   (real_overall.get("accuracy") or 0) * 100.0},
+        # Compute (TFLOPS) is unknown in a “real” run; leave None
+        "compute":    {"original": None,                "pruned": None},
     }
 
-    return jsonify(benchmark_data), 200
+    # Final response mirrors what the front-end expects
+    resp = {
+        "model": model,
+        "gpu": gpu_label,           # <<< stops showing “NVIDIA A100”
+        "location": location,
+        "threshold": threshold,
+        "overall": {                # keep “overall” accuracy accessible too
+            "accuracy": {
+                "original": (real_overall.get("accuracy") or 0),
+                "pruned":   (real_overall.get("accuracy") or 0),
+            }
+        },
+        "metricCards": metric_cards,
+        # keep realBenchmark visible for any UI “drilldown”
+        "realBenchmark": rb
+    }
+    return jsonify(resp)
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def spa_index(path: str):
+    # If the request looks like an API/socket/asset route, let Flask handle it
+    for p in API_PREFIXES:
+        if path.startswith(p.lstrip('/')):
+            return ("Not Found", 404)
+
+    # Otherwise return the Angular app shell
+    idx = os.path.join(app.static_folder, "index.html")
+    if os.path.exists(idx):
+        return send_from_directory(app.static_folder, "index.html")
+    return ("Frontend not bundled (index.html missing).", 500)
 
 # ---- entrypoint ----
 if __name__ == "__main__":

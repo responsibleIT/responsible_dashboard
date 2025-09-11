@@ -15,6 +15,7 @@ from loading import load_huggingface_model, load_local_model
 from preprocess import disable_low_weight_neurons
 from benchmark import evaluate_model
 from predict import predict_with_auto_regressive_model
+from utils.gpu_power import sample_gpu_power_background
 
 import glob
 
@@ -84,6 +85,7 @@ def infer_label_mapping(series: pd.Series) -> dict[int, str]:
     except Exception:
         uniques_sorted = uniques
     return {i: str(uniques_sorted[i]) for i in range(len(uniques_sorted))}
+
 
 def create_baseline_metrics(metrics, model_info, label_mapping: dict[int, str], threshold=0):
     return {
@@ -182,35 +184,23 @@ def detect_local_device() -> str:
 
     return "CPU"
 
-def sample_gpu_power_background(stop_evt: threading.Event, interval: float = 0.2):
-    """
-    If NVML is present, sample total board power (Watts) in the background.
-    Returns a list that will be populated with float readings.
-    If NVML is not available, returns an empty list and does nothing.
-    """
-    readings: list[float] = []
-
-    def _runner():
-        with suppress(Exception):
-            import pynvml  # pip install nvidia-ml-py3
-            pynvml.nvmlInit()
-            try:
-                h = pynvml.nvmlDeviceGetHandleByIndex(0)
-                while not stop_evt.is_set():
-                    mw = pynvml.nvmlDeviceGetPowerUsage(h)  # milliwatts
-                    readings.append(mw / 1000.0)  # -> Watts
-                    stop_evt.wait(interval)
-            finally:
-                with suppress(Exception):
-                    pynvml.nvmlShutdown()
-
-    # try to start; if import fails, thread will never add data
-    t = threading.Thread(target=_runner, daemon=True)
-    t.start()
-    return readings, t
-
 # --- Main WebSocket Handler ---
 def websocket_handlers(socketio):
+    def _emit_progress(upload_id: str, done: int, total: int, started_at: float):
+        elapsed = time.perf_counter() - started_at
+        rate = done / elapsed if elapsed > 0 else 0.0
+        eta = (total - done) / rate if rate > 0 else None
+        socketio.emit(
+            "status",
+            {
+                "type": "progress",
+                "done": int(done),
+                "total": int(total),
+                "rate": rate,             # samples/sec
+                "eta_sec": eta            # may be None early on
+            },
+            to=upload_id
+        )
 
     @socketio.on('connect')
     def handle_connect():
@@ -250,6 +240,7 @@ def websocket_handlers(socketio):
             )
             return
 
+        socketio.emit("status", {"message": f"[START DEBUG] Reading from: {upload_path}"}, to=upload_id)
         def process():
             try:
                 socketio.emit("status", {"message": "Model is being loaded..."}, to=upload_id)
@@ -294,8 +285,15 @@ def websocket_handlers(socketio):
                 pruned_model, model_info = disable_low_weight_neurons(model_copy, 10)
 
                 socketio.emit("status", {"message": "Benchmarking model..."}, to=upload_id)
-                baseline = evaluate_model(model, tokenizer, df, target_col=target_col)
-                pruned = evaluate_model(pruned_model, tokenizer, df, target_col=target_col)
+
+                started_at = time.perf_counter()
+                def progress_cb(done, total):
+                    _emit_progress(upload_id, done, total, started_at)
+
+                baseline = evaluate_model(model, tokenizer, df, target_col=target_col,
+                          progress_cb=progress_cb)
+                pruned = evaluate_model(pruned_model, tokenizer, df, target_col=target_col,
+                                        progress_cb=progress_cb)
 
                 socketio.emit("status", {"message": "Collecting pruning data..."}, to=upload_id)
                 pruned_data = {
@@ -311,9 +309,17 @@ def websocket_handlers(socketio):
                     pruned_data[t] = create_threshold_data_entry(metrics, t)
 
                 socketio.emit("status", {"message": "Predicting performance..."}, to=upload_id)
-                pruned_data = predict_with_auto_regressive_model(pruned_data, "accuracy")
+                try:
+                    pred = predict_with_auto_regressive_model(pruned_data, "accuracy")
+                    if isinstance(pred, dict) and pred:
+                        pruned_data = pred
+                    # else keep the baseline-filled pruned_data we already built
+                except Exception:
+                    # swallow prediction errors and keep baseline-only curves
+                    pass
 
                 save_json_file(upload_id, "pruned_threshold_data.json", pruned_data)
+                socketio.emit("status", {"message": f"[START DEBUG] Saved pruned data to {os.path.join(get_upload_path(upload_id), 'pruned_threshold_data.json')}"}, to=upload_id)
                 save_json_file(upload_id, "label_mapping.json", label_mapping)
 
                 socketio.emit("status", {
@@ -364,7 +370,12 @@ def websocket_handlers(socketio):
                 pruned_model, model_info = disable_low_weight_neurons(model, threshold)
 
                 socketio.emit("status", {"message": "Benchmarking model..."}, to=upload_id)
-                benchmark = evaluate_model(pruned_model, tokenizer, df)
+                started_at = time.perf_counter()
+
+                def progress_cb(done, total):
+                    _emit_progress(upload_id, done, total, started_at)
+
+                benchmark = evaluate_model(pruned_model, tokenizer, df, progress_cb=progress_cb)
 
                 pruned_data = load_json_file(upload_id, "pruned_threshold_data.json")
 
@@ -391,27 +402,37 @@ def websocket_handlers(socketio):
         Run a *real* benchmark on this machine:
         - load model (HF or local)
         - prune at requested threshold
-        - time a real evaluation on the uploaded dataset
+        - evaluate on the uploaded dataset using the user-selected target column
         - optionally sample real GPU power with NVML
         - persist results under 'realBenchmark' in benchmark_data.json
         """
         upload_id = data.get("upload_id")
-        threshold = data.get("threshold")
+        threshold = float(data.get("threshold", 0) or 0.0)
+        gpu = data.get("gpu")           # optional, backend can ignore
+        location = data.get("location") # optional, backend can ignore
 
-        async def process():
+        def process():  # IMPORTANT: sync function (not async)
             try:
+                # quick sanity
+                if not upload_id:
+                    socketio.emit("status", {
+                        "type": "error",
+                        "message": "Missing upload_id for real benchmark."
+                    }, to=request.sid)
+                    return
+
                 socketio.emit("status", {"message": "Preparing real benchmark..."}, to=upload_id)
 
-                # 1) Load dataset & columns
+                # 1) Load dataset & target column
                 df = load_dataset(upload_id)
-                # load selected columns if you are using the new target-only flow
-                with suppress(Exception):
-                    cols = load_json_file(upload_id, "selected_columns.json")
-                    target_col = cols.get("target_column")
-                    if target_col and target_col in df.columns:
-                        # Evaluate path already expects text/label names. If your evaluator
-                        # relies on specific names, rename here; otherwise you can skip this.
-                        pass
+                try:
+                    sel = load_json_file(upload_id, "selected_columns.json")
+                    target_col = sel.get("target_column")
+                    if not target_col or target_col not in df.columns:
+                        # last column fallback
+                        target_col = df.columns[-1]
+                except Exception:
+                    target_col = df.columns[-1]
 
                 # 2) Load model (HF first, else local)
                 hf_url = get_huggingface_url(upload_id)
@@ -433,40 +454,63 @@ def websocket_handlers(socketio):
                 # 3) Prune to requested threshold
                 pruned_model, model_info = disable_low_weight_neurons(model, threshold)
 
-                # 4) Time a *real* evaluation + optional GPU power sampling
+                # 4) Evaluate with progress updates and optional power sampling
                 socketio.emit("status", {"message": "Running real benchmark..."}, to=upload_id)
+
+                # background power sampler (sync/threaded)
                 stop_evt = threading.Event()
                 power_readings, power_thread = sample_gpu_power_background(stop_evt, interval=0.25)
 
+                def progress_cb(done, total):
+                    socketio.emit("status", {
+                        "message": f"Evaluating {done}/{total} samples..."
+                    }, to=upload_id)
+
                 t0 = time.perf_counter()
-                real_metrics = evaluate_model(pruned_model, tokenizer, df, target_col=target_col)
+                real_metrics = evaluate_model(pruned_model, tokenizer, df, target_col=target_col,
+                              progress_cb=lambda d,t: socketio.emit("status",
+                                  {"message": f"Evaluating {d}/{t} samples...", "type":"loading"},
+                                  to=upload_id))
                 elapsed = time.perf_counter() - t0
-                stop_evt.set()
-                power_thread.join(timeout=0.5)
+
+                if stop_evt:
+                    stop_evt.set()
+                if power_thread:
+                    power_thread.join(timeout=0.5)
 
                 # Aggregate power (if any)
-                avg_watts = sum(power_readings) / len(power_readings) if power_readings else None
-                energy_j = (avg_watts * elapsed) if avg_watts is not None else None
+                avg_watts = sum(power_readings)/len(power_readings) if power_readings else None
+                energy_j  = (avg_watts * elapsed) if avg_watts is not None else None
 
                 # 5) Merge into benchmark_data.json (append 'realBenchmark')
                 bench_path = os.path.join(get_upload_path(upload_id), "benchmark_data.json")
                 base_payload = {}
                 if os.path.exists(bench_path):
                     with open(bench_path, "r", encoding="utf-8") as f:
-                        base_payload = json.load(f)
+                        try:
+                            base_payload = json.load(f)
+                        except Exception:
+                            base_payload = {}
 
-                base_payload.setdefault("model", model_id_for_benchmark)
-                base_payload.setdefault("threshold", threshold)
+                device_label = detect_local_device()  # e.g., "NVIDIA GeForce RTX 4060" or "CPU"
+                throughput = (len(df) / elapsed) if elapsed > 0 else None
 
-                base_payload["realBenchmark"] = {
-                    "device": detect_local_device(),
-                    "elapsedSec": elapsed,
-                    "samples": int(len(df)),
-                    "throughputSamplesPerSec": (len(df) / elapsed) if elapsed > 0 else None,
-                    "avgGpuPowerW": avg_watts,       # may be None if NVML unavailable
-                    "energyJoules": energy_j,        # may be None
-                    "metrics": real_metrics.get("overall", {})  # accuracy/precision/recall/f1 from real run
-                }
+                base_payload.update({
+                    "model": model_id_for_benchmark,
+                    "threshold": threshold,
+                    # Keep the *UI* GPU label aligned with the *real* run:
+                    "gpu": device_label,
+                    "location": data.get("location") or base_payload.get("location"),
+                    "realBenchmark": {
+                        "device": device_label,
+                        "elapsedSec": elapsed,
+                        "samples": int(len(df)),
+                        "throughputSamplesPerSec": throughput,
+                        "avgGpuPowerW": avg_watts,     # may be None
+                        "energyJoules": energy_j,      # may be None
+                        "metrics": real_metrics.get("overall", {})  # accuracy/precision/recall/f1
+                    }
+                })
 
                 with open(bench_path, "w", encoding="utf-8") as f:
                     json.dump(base_payload, f, indent=2)
@@ -482,5 +526,6 @@ def websocket_handlers(socketio):
                     "message": f"Real benchmark failed: {e}"
                 }, to=upload_id)
 
+        # Start the sync background task
         socketio.start_background_task(process)
 
