@@ -1,25 +1,17 @@
-import {Component, Input} from '@angular/core';
-import {
-    MetricCardComponent
-} from "@app/pages/pruning-adjustments/components/pruning-results/pruning-metric-cards/metric-card/metric-card.component";
-import {
-  BenchmarkMetricCardComponent
-} from '@app/pages/benchmark-results/components/benchmark-details/benchmark-metric-cards/benchmark-metric-card/benchmark-metric-card.component';
-import {BenchmarkMetricCardList} from '@app/types/pruning.types';
-import {AsyncPipe} from '@angular/common';
+import { Component, Input } from '@angular/core';
+import { NgIf } from '@angular/common';
+import { BenchmarkMetric } from '@app/types/benchmark.types';
+import { BenchmarkMetricCardComponent } from './benchmark-metric-card/benchmark-metric-card.component';
 
 @Component({
   selector: 'app-benchmark-metric-cards',
-  imports: [
-    MetricCardComponent,
-    BenchmarkMetricCardComponent,
-    AsyncPipe
-  ],
+  standalone: true,
+  imports: [NgIf, BenchmarkMetricCardComponent],
   templateUrl: './benchmark-metric-cards.component.html',
   styleUrls: ['./benchmark-metric-cards.component.scss']
 })
 export class BenchmarkMetricCardsComponent {
-
-  @Input() metrics: BenchmarkMetricCardList | undefined;
-
+  @Input() metrics:
+    | { power?: BenchmarkMetric; performance?: BenchmarkMetric; emissions?: BenchmarkMetric; compute?: BenchmarkMetric }
+    | null = null;
 }

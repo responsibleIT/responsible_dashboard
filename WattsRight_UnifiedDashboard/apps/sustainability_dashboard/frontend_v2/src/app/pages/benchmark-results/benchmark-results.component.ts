@@ -4,13 +4,15 @@ import { UploadService } from '@app/services/upload.service';
 import { BenchmarkService } from '@app/services/benchmark.service';
 import { CommonModule } from '@angular/common';
 import { WebsocketService } from '@app/services/websocket.service';
+import {BenchmarkDetailsComponent} from '@app/pages/benchmark-results/components/benchmark-details/benchmark-details.component';
+import {BenchmarkMetricCardList, ClassPerformance} from '@app/types/pruning.types';
 
 type Pair = { orig: number | null; pruned: number | null };
 
 @Component({
   selector: 'app-benchmark-results',
   standalone: true,
-  imports: [CommonModule], // CommonModule covers NgIf, NgFor, number pipe
+  imports: [CommonModule, BenchmarkDetailsComponent], // reuse existing detail components
   templateUrl: './benchmark-results.component.html',
   styleUrls: ['./benchmark-results.component.scss']
 })
@@ -21,6 +23,7 @@ export class BenchmarkResultsComponent implements OnInit {
     emissions: { orig: null, pruned: null },
     compute: { orig: null, pruned: null }
   };
+  metricCards: BenchmarkMetricCardList | null = null;
 
   modelName = '—';
   gpuLabel  = '—';
@@ -30,13 +33,7 @@ export class BenchmarkResultsComponent implements OnInit {
   originalParameters: number | null = null;
   prunedParameters: number | null = null;
 
-  classes: Array<{
-    name: string;
-    overallAcc: number;
-    deltaAcc: number;
-    f1: Pair; precision: Pair; recall: Pair; accuracy: Pair;
-    expanded: boolean;
-  }> = [];
+  classes: ClassPerformance[] = [];
 
   constructor(
     private readonly uploads: UploadService,
@@ -47,25 +44,15 @@ export class BenchmarkResultsComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    const qid  = this.route.snapshot.queryParamMap.get('upload_id');
-    // 👇 ensure this matches your service naming
-    const svcId = (this.uploads as any).upload_id?.value ?? (this.uploads as any).upload_id?.value ?? null;
-    const wsId  = this.ws.getUploadId() ?? null;
+    this.route.data.subscribe(data => {
+      const resolved = data['benchmark'];
 
-    const upload_id = qid ?? svcId ?? wsId;
+      console.log('[BenchmarkResults] resolver delivered data', resolved);
 
-    console.log('[BenchmarkResults] resolved upload_id sources', { qid, svcId, wsId, chosen: upload_id });
-
-    if (!upload_id) {
-      console.error('[results] missing upload_id');
-      this.router.navigateByUrl('/');
-      return;
-    }
-
-    this.benchmark.fetchData(upload_id).subscribe({
-      next: (res: any) => this.hydrate(res),
-      error: (err) => {
-        console.error('[results] fetch error', err);
+      if (resolved) {
+        this.hydrate(resolved);
+      } else {
+        console.error('[results] no benchmark data resolved');
         this.router.navigateByUrl('/');
       }
     });
@@ -83,11 +70,18 @@ export class BenchmarkResultsComponent implements OnInit {
 
     const mc = res?.metricCards ?? {};
     const pick = (k: string): Pair => ({ orig: this.n(mc?.[k]?.original), pruned: this.n(mc?.[k]?.pruned) });
-
     this.cards.power       = pick('power');
     this.cards.performance = pick('performance');
     this.cards.emissions   = pick('emissions');
     this.cards.compute     = pick('compute');
+    if (mc?.power) {
+      this.metricCards = {
+        power: { title: 'Power (per 1000 calls)', unit: 'kWh', original: mc.power.original, pruned: mc.power.pruned, change: (mc.power.pruned - mc.power.original) / (mc.power.original || 1) * 100 },
+        performance: { title: 'Accuracy', unit: '%', original: mc.performance.original, pruned: mc.performance.pruned, change: (mc.performance.pruned - mc.performance.original)/(mc.performance.original||1)*100 },
+        emissions: { title: 'Carbon (per 1000 calls)', unit: 'gCO₂', original: mc.emissions.original, pruned: mc.emissions.pruned, change: (mc.emissions.pruned - mc.emissions.original)/(mc.emissions.original||1)*100 },
+        compute: { title: 'Computing Power', unit: 'TFLOPS', original: mc.compute.original, pruned: mc.compute.pruned, change: (mc.compute.pruned - mc.compute.original)/(mc.compute.original||1)*100 }
+      };
+    }
 
     // compute size reduction percentage (based on compute or power if compute absent)
     // size reduction: prefer explicit params if available, else fall back to compute/power heuristic
@@ -103,17 +97,22 @@ export class BenchmarkResultsComponent implements OnInit {
       }
     }
 
-    const cl = res?.classMetrics ?? {};
-    this.classes = Array.isArray(cl?.items) ? cl.items.map((it: any, idx: number) => ({
-      name: String(it?.name ?? 'Class'),
-      overallAcc: this.n(it?.accuracy) ?? 0,
-      deltaAcc:   this.n(it?.deltaAccuracy) ?? 0,
-      f1:         { orig: this.n(it?.f1?.original),        pruned: this.n(it?.f1?.pruned) },
-      precision:  { orig: this.n(it?.precision?.original), pruned: this.n(it?.precision?.pruned) },
-      recall:     { orig: this.n(it?.recall?.original),     pruned: this.n(it?.recall?.pruned) },
-      accuracy:   { orig: this.n(it?.accuracyOriginal),     pruned: this.n(it?.accuracyPruned) },
-      expanded: idx < 2 // open first two by default
-    })) : [];
+    // adapt to existing BenchmarkClassesComponent expects ClassPerformance[]: { className, performance }
+    if (res?.perClass && typeof res.perClass === 'object') {
+      const norm = (v: number | null): number => {
+        if (v === null) return 0;
+        return v > 1 ? v / 100 : v; // backend might return percentages (e.g., 74.6) we normalize to 0-1
+      };
+      this.classes = Object.entries(res.perClass).map(([className, perf]: [string, any]) => ({
+        className: className,
+        performance: {
+          accuracy: { original: norm(this.n(perf?.accuracy?.original)), pruned: norm(this.n(perf?.accuracy?.pruned)) },
+          precision: { original: norm(this.n(perf?.precision?.original)), pruned: norm(this.n(perf?.precision?.pruned)) },
+          recall: { original: norm(this.n(perf?.recall?.original)), pruned: norm(this.n(perf?.recall?.pruned)) },
+          f1Score: { original: norm(this.n(perf?.f1Score?.original ?? perf?.f1?.original)), pruned: norm(this.n(perf?.f1Score?.pruned ?? perf?.f1?.pruned)) }
+        }
+      }));
+    }
   }
 
   // helpers
@@ -139,13 +138,15 @@ export class BenchmarkResultsComponent implements OnInit {
     const arrow = d >= 0 ? '↑' : '↓';
     return `${arrow} ${Math.abs(d).toFixed(1)}%`;
   }
+  metricDelta(orig: number | null, pruned: number | null): string {
+    if (orig === null || pruned === null) return '0.00%';
+    const diff = pruned - orig;
+    const sign = diff > 0 ? '+' : '';
+    return `${sign}${diff.toFixed(2)}%`;
+  }
 
   goBack(): void {
     this.router.navigateByUrl('/pruning-adjustments');
-  }
-
-  toggleClass(c: any) {
-    c.expanded = !c.expanded;
   }
 
   exportModel() {

@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
-import {BehaviorSubject, catchError, map, Observable, throwError} from 'rxjs';
-import {BenchmarkData} from '@app/types/pruning.types';
-import {HttpClient} from '@angular/common/http';
-import {environment} from '@env/environment';
+import { BehaviorSubject, catchError, map, Observable, throwError } from 'rxjs';
+import { BenchmarkData } from '@app/types/pruning.types';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '@env/environment';
 
 @Injectable({
   providedIn: 'root'
@@ -10,6 +10,7 @@ import {environment} from '@env/environment';
 export class BenchmarkService {
 
   private readonly apiUrl = `${environment.api.schema}://${environment.api.hostname}`;
+  private currentUploadId: string | null = null;  // 👈 stash last upload id
 
   public data$ = new BehaviorSubject<BenchmarkData | null>(null);
 
@@ -18,10 +19,11 @@ export class BenchmarkService {
   ) { }
 
   public fetchData(upload_id: string): Observable<BenchmarkData> {
+    this.currentUploadId = upload_id; // 👈 save it
     return this.http.get(`${this.apiUrl}/benchmark/${upload_id}`).pipe(
       map(response => response as BenchmarkData),
       catchError(error => throwError(() => new Error('Error fetching benchmark: ' + error.message)))
-    )
+    );
   }
 
   public set Data(data: BenchmarkData | null) {
@@ -30,5 +32,10 @@ export class BenchmarkService {
 
   public get Data(): BenchmarkData | null {
     return this.data$.getValue();
+  }
+
+  // 👇 expose for resolver
+  public get uploadId(): string | null {
+    return this.currentUploadId;
   }
 }

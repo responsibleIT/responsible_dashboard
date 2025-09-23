@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 
 from loading import load_huggingface_model, load_local_model
 from preprocess import disable_low_weight_neurons
+from pruning import estimate_flops
 from benchmark import evaluate_model
 from predict import predict_with_auto_regressive_model
 from utils.gpu_power import sample_gpu_power_background
@@ -389,136 +390,301 @@ def websocket_handlers(socketio):
 
         socketio.start_background_task(process)
     
-    @socketio.on('benchmark_real')
+    @socketio.on("benchmark_real")
     def handle_benchmark_real(data):
         """
-        Run a *real* benchmark on this machine:
-        - load model (HF or local)
-        - prune at requested threshold
-        - evaluate on the uploaded dataset using the user-selected target column
-        - optionally sample real GPU power with NVML
-        - persist results under 'realBenchmark' in benchmark_data.json
+        ORIGINAL -> PRUNE -> PRUNED
+        Builds metricCards (kWh & gCO2 per 1000 calls, accuracy %, TFLOPs per call),
+        plus rich per-class and realBenchmark blocks. Extremely chatty debug emits.
         """
-        upload_id = data.get("upload_id")
-        threshold = float(data.get("threshold", 0) or 0.0)
-        gpu = data.get("gpu")           # optional, backend can ignore
-        location = data.get("location") # optional, backend can ignore
+        import os, json, time, threading, traceback
+        from flask import request
 
-        def process():  # IMPORTANT: sync function (not async)
+        # local import so this stays drop-in
+        try:
+            from pruning import disable_low_weight_neurons, estimate_flops
+        except Exception:
+            # disable_low_weight_neurons may already be imported at module level
+            disable_low_weight_neurons  # type: ignore
+
+            def estimate_flops(_model, seq_length: int = 128):
+                # minimal safe fallback: no FLOPs estimate available
+                raise RuntimeError("estimate_flops not available")
+
+        upload_id = (data or {}).get("upload_id")
+        try:
+            threshold = float((data or {}).get("threshold", 0) or 0.0)
+        except Exception:
+            threshold = 0.0
+
+        def _emit(msg, typ="debug", extra=None, to_room=None):
+            payload = {"type": typ, "message": msg}
+            if extra is not None:
+                payload["extra"] = extra
+            room = to_room or upload_id or request.sid
             try:
-                # quick sanity
-                if not upload_id:
-                    socketio.emit("status", {
-                        "type": "error",
-                        "message": "Missing upload_id for real benchmark."
-                    }, to=request.sid)
-                    return
+                socketio.emit("status", payload, to=room)
+            except Exception:
+                pass
+            print(msg)
 
-                socketio.emit("status", {"message": "Preparing real benchmark..."}, to=upload_id)
-
-                # 1) Load dataset & target column
-                df = load_dataset(upload_id)
+        def _pair(a, b):
+            # always numbers (never None) so Angular can render safely
+            def _num(x):
                 try:
-                    sel = load_json_file(upload_id, "selected_columns.json")
-                    target_col = sel.get("target_column")
-                    if not target_col or target_col not in df.columns:
-                        # last column fallback
-                        target_col = df.columns[-1]
+                    if x is None: return 0.0
+                    # cast numpy types too
+                    return float(x)
                 except Exception:
-                    target_col = df.columns[-1]
+                    return 0.0
+            return {"original": _num(a), "pruned": _num(b)}
 
-                # 2) Load model (HF first, else local)
-                hf_url = get_huggingface_url(upload_id)
-                local_model_path = find_local_model(upload_id)
+        def _percent(x):
+            # 0..1 -> 0..100 ; keep numbers
+            try:
+                return float(x) * 100.0
+            except Exception:
+                return 0.0
 
-                if hf_url:
-                    model, tokenizer = load_huggingface_model(hf_url)
-                    model_id_for_benchmark = hf_url
-                elif local_model_path:
-                    model, tokenizer = load_local_model(local_model_path)
-                    model_id_for_benchmark = os.path.basename(local_model_path)
-                else:
-                    socketio.emit("status", {
-                        "type": "error",
-                        "message": "No model available. Provide a HF repo or upload a model."
-                    }, to=upload_id)
+        def _grid_factor_g_per_kwh(loc: str) -> float:
+            # quick-and-safe factors; adjust as you like
+            # sources vary—these are ballpark so the card has data
+            table = {
+                "france": 50.0,
+                "netherlands": 475.0,
+                "germany": 400.0,
+                "uk": 212.0,
+                "usa": 386.0,
+                "australia": 700.0,
+            }
+            return table.get((loc or "").lower(), 400.0)
+
+        def process():
+            try:
+                if not upload_id:
+                    _emit("[DEBUG] Missing upload_id for real benchmark.", "error", to_room=request.sid)
                     return
 
-                # 3) Prune to requested threshold
-                pruned_model, model_info = disable_low_weight_neurons(model, threshold)
+                _emit(f"[DEBUG] Starting benchmark_real | upload_id={upload_id} | threshold={threshold}")
 
-                # 4) Evaluate with progress updates and optional power sampling
-                socketio.emit("status", {"message": "Running real benchmark..."}, to=upload_id)
+                # 1) DATASET ------------------------------------------------------
+                try:
+                    df = load_dataset(upload_id)
+                    _emit(f"[DEBUG] Dataset loaded: shape={getattr(df, 'shape', None)}; "
+                        f"columns={list(getattr(df, 'columns', []))}")
+                except Exception as e:
+                    _emit(f"[DEBUG] Failed to load dataset: {e}", "error")
+                    _emit(traceback.format_exc(), "error")
+                    return
 
-                # background power sampler (sync/threaded)
+                try:
+                    sel = load_json_file(upload_id, "selected_columns.json") or {}
+                except Exception:
+                    sel = {}
+                target_col = sel.get("target_column")
+                if not target_col or target_col not in getattr(df, "columns", []):
+                    target_col = list(getattr(df, "columns", []))[-1] if getattr(df, "columns", []) else None
+                if not target_col:
+                    _emit("[DEBUG] No target column found.", "error")
+                    return
+                _emit(f"[DEBUG] Target column resolved: {target_col}")
+
+                samples = int(len(df))
+
+                # 2) MODEL --------------------------------------------------------
+                hf_url = None
+                local_model_path = None
+                try:
+                    hf_url = get_huggingface_url(upload_id)
+                except Exception:
+                    pass
+                try:
+                    local_model_path = find_local_model(upload_id)
+                except Exception:
+                    pass
+
+                try:
+                    if hf_url:
+                        model, tokenizer = load_huggingface_model(hf_url)
+                        model_id_for_benchmark = hf_url
+                        _emit(f"[DEBUG] Loaded HuggingFace model: {hf_url}")
+                    elif local_model_path:
+                        model, tokenizer = load_local_model(local_model_path)
+                        model_id_for_benchmark = os.path.basename(local_model_path)
+                        _emit(f"[DEBUG] Loaded local model: {local_model_path}")
+                    else:
+                        _emit("[DEBUG] No model found.", "error")
+                        return
+                except Exception as e:
+                    _emit(f"[DEBUG] Model load failed: {e}", "error")
+                    _emit(traceback.format_exc(), "error")
+                    return
+
+                # 3) ORIGINAL EVAL + POWER ---------------------------------------
                 stop_evt = threading.Event()
                 power_readings, power_thread = sample_gpu_power_background(stop_evt, interval=0.25)
 
-                def progress_cb(done, total):
-                    socketio.emit("status", {
-                        "message": f"Evaluating {done}/{total} samples..."
-                    }, to=upload_id)
+                def _progress(done, total):
+                    try:
+                        socketio.emit("status",
+                                    {"message": f"Evaluating {done}/{total} samples...", "type": "loading"},
+                                    to=upload_id)
+                    except Exception:
+                        pass
 
+                _emit("[DEBUG] Evaluating ORIGINAL model...")
                 t0 = time.perf_counter()
-                real_metrics = evaluate_model(pruned_model, tokenizer, df, target_col=target_col,
-                              progress_cb=lambda d,t: socketio.emit("status",
-                                  {"message": f"Evaluating {d}/{t} samples...", "type":"loading"},
-                                  to=upload_id))
-                elapsed = time.perf_counter() - t0
-
-                if stop_evt:
-                    stop_evt.set()
+                orig_metrics = evaluate_model(model, tokenizer, df, target_col=target_col, progress_cb=_progress)
+                elapsed_orig = time.perf_counter() - t0
+                stop_evt.set()
                 if power_thread:
                     power_thread.join(timeout=0.5)
+                avg_watts_orig = (sum(power_readings) / len(power_readings)) if power_readings else 0.0
+                energy_j_orig = avg_watts_orig * elapsed_orig  # Joules (W·s)
+                thrpt_orig = (samples / elapsed_orig) if elapsed_orig > 0 else 0.0
 
-                # Aggregate power (if any)
-                avg_watts = sum(power_readings)/len(power_readings) if power_readings else None
-                energy_j  = (avg_watts * elapsed) if avg_watts is not None else None
+                _emit(f"[DEBUG] ORIGINAL: elapsed={elapsed_orig:.3f}s | avg_watts={avg_watts_orig:.3f} "
+                    f"| joules={energy_j_orig:.3f} | thrpt={thrpt_orig:.3f}/s")
 
-                # 5) Merge into benchmark_data.json (append 'realBenchmark')
-                bench_path = os.path.join(get_upload_path(upload_id), "benchmark_data.json")
-                base_payload = {}
-                if os.path.exists(bench_path):
-                    with open(bench_path, "r", encoding="utf-8") as f:
-                        try:
-                            base_payload = json.load(f)
-                        except Exception:
-                            base_payload = {}
+                # 4) PRUNE + PRUNED EVAL -----------------------------------------
+                pruned_model, model_info = disable_low_weight_neurons(model, threshold)
+                _emit(f"[DEBUG] Pruned model at threshold={threshold}")
 
-                device_label = detect_local_device()  # e.g., "NVIDIA GeForce RTX 4060" or "CPU"
-                throughput = (len(df) / elapsed) if elapsed > 0 else None
+                orig_params = ((model_info or {}).get("original", {}) or {}).get("non_zero_params", 0)
+                prun_params = ((model_info or {}).get("after_pruning", {}) or {}).get("non_zero_params", 0)
+                _emit(f"[DEBUG] Params non-zero: original={orig_params} | pruned={prun_params}")
 
-                base_payload.update({
+                stop_evt2 = threading.Event()
+                power_readings2, power_thread2 = sample_gpu_power_background(stop_evt2, interval=0.25)
+                _emit("[DEBUG] Evaluating PRUNED model...")
+                t1 = time.perf_counter()
+                pruned_metrics = evaluate_model(pruned_model, tokenizer, df, target_col=target_col, progress_cb=_progress)
+                elapsed_pruned = time.perf_counter() - t1
+                stop_evt2.set()
+                if power_thread2:
+                    power_thread2.join(timeout=0.5)
+                avg_watts_pruned = (sum(power_readings2) / len(power_readings2)) if power_readings2 else 0.0
+                energy_j_pruned = avg_watts_pruned * elapsed_pruned
+                thrpt_pruned = (samples / elapsed_pruned) if elapsed_pruned > 0 else 0.0
+
+                _emit(f"[DEBUG] PRUNED:   elapsed={elapsed_pruned:.3f}s | avg_watts={avg_watts_pruned:.3f} "
+                    f"| joules={energy_j_pruned:.3f} | thrpt={thrpt_pruned:.3f}/s")
+
+                # 5) FLOPS (safe) -------------------------------------------------
+                orig_flops = pruned_flops = None
+                try:
+                    orig_flops, _ = estimate_flops(model)          # operations per call
+                    pruned_flops, _ = estimate_flops(pruned_model)
+                    _emit(f"[DEBUG] FLOPs (per call): original={orig_flops} | pruned={pruned_flops}")
+                except Exception as e:
+                    _emit(f"[DEBUG] FLOPs estimation failed: {e}")
+
+                # TFLOPs-per-call number for the card (fallback to param counts)
+                tflops_orig = (orig_flops / 1e12) if isinstance(orig_flops, (int, float)) else float(orig_params or 0)
+                tflops_prun = (pruned_flops / 1e12) if isinstance(pruned_flops, (int, float)) else float(prun_params or 0)
+
+                # 6) Cards: kWh & gCO2 per 1000 calls, accuracy %, TFLOPs --------
+                loc = (data or {}).get("location") or "france"
+                g_per_kwh = _grid_factor_g_per_kwh(loc)
+
+                # kWh per 1000 calls
+                kwh_orig_per_1k = ((energy_j_orig / 3_600_000.0) / max(samples, 1)) * 1000.0
+                kwh_prun_per_1k = ((energy_j_pruned / 3_600_000.0) / max(samples, 1)) * 1000.0
+                gco2_orig_per_1k = kwh_orig_per_1k * g_per_kwh
+                gco2_prun_per_1k = kwh_prun_per_1k * g_per_kwh
+
+                metric_cards = {
+                    "power": {        # actually "energy" but UI labels it kWh
+                        "original": float(kwh_orig_per_1k),
+                        "pruned":   float(kwh_prun_per_1k),
+                    },
+                    "performance": {
+                        "original": float(_percent(orig_metrics.get("overall", {}).get("accuracy", 0.0))),
+                        "pruned":   float(_percent(pruned_metrics.get("overall", {}).get("accuracy", 0.0))),
+                    },
+                    "emissions": {
+                        "original": float(gco2_orig_per_1k),
+                        "pruned":   float(gco2_prun_per_1k),
+                    },
+                    "compute": {
+                        "original": float(tflops_orig),
+                        "pruned":   float(tflops_prun),
+                    }
+                }
+                _emit(f"[DEBUG] metricCards: {metric_cards}")
+
+                # 7) Overall + per-class blocks ----------------------------------
+                overall_block = {
+                    "accuracy":  _pair(orig_metrics["overall"]["accuracy"],  pruned_metrics["overall"]["accuracy"]),
+                    "precision": _pair(orig_metrics["overall"]["precision"], pruned_metrics["overall"]["precision"]),
+                    "recall":    _pair(orig_metrics["overall"]["recall"],    pruned_metrics["overall"]["recall"]),
+                    "f1Score":   _pair(orig_metrics["overall"]["f1_score"],  pruned_metrics["overall"]["f1_score"]),
+                }
+
+                per_class_block = {}
+                for lab in set(orig_metrics.keys()) | set(pruned_metrics.keys()):
+                    if lab == "overall":
+                        continue
+                    o = orig_metrics.get(lab, {})
+                    p = pruned_metrics.get(lab, {})
+                    per_class_block[str(lab)] = {
+                        "accuracy":  _pair(o.get("accuracy"),  p.get("accuracy")),
+                        "precision": _pair(o.get("precision"), p.get("precision")),
+                        "recall":    _pair(o.get("recall"),    p.get("recall")),
+                        "f1Score":   _pair(o.get("f1_score"),  p.get("f1_score")),
+                    }
+
+                # 8) Compose JSON -------------------------------------------------
+                device_label = detect_local_device()
+                benchmark_data = {
                     "model": model_id_for_benchmark,
-                    "threshold": threshold,
-                    # Keep the *UI* GPU label aligned with the *real* run:
+                    "threshold": float(threshold),
                     "gpu": device_label,
-                    "location": data.get("location") or base_payload.get("location"),
+                    "location": loc,
+                    "originalParameters": int(orig_params or 0),
+                    "prunedParameters": int(prun_params or 0),
+
+                    # NEW: metric cards the Angular header uses
+                    "metricCards": metric_cards,
+
+                    "overall": overall_block,
+                    "perClass": per_class_block,
+
                     "realBenchmark": {
                         "device": device_label,
-                        "elapsedSec": elapsed,
-                        "samples": int(len(df)),
-                        "throughputSamplesPerSec": throughput,
-                        "avgGpuPowerW": avg_watts,     # may be None
-                        "energyJoules": energy_j,      # may be None
-                        "metrics": real_metrics.get("overall", {})  # accuracy/precision/recall/f1
+                        "elapsedSecOriginal": float(elapsed_orig),
+                        "elapsedSecPruned":   float(elapsed_pruned),
+                        "samples": samples,
+                        "throughputOriginal": float(thrpt_orig),
+                        "throughputPruned":   float(thrpt_pruned),
+                        "avgGpuPowerWOriginal": float(avg_watts_orig),
+                        "avgGpuPowerWPruned":   float(avg_watts_pruned),
+                        "energyJoulesOriginal": float(energy_j_orig),
+                        "energyJoulesPruned":   float(energy_j_pruned),
+                        "tflopsPerCallOriginal": float(tflops_orig),
+                        "tflopsPerCallPruned":   float(tflops_prun),
+                        "metricsOriginal": orig_metrics.get("overall", {}),
+                        "metricsPruned":   pruned_metrics.get("overall", {}),
                     }
-                })
+                }
 
+                # 9) Save ---------------------------------------------------------
+                bench_dir = get_upload_path(upload_id)
+                os.makedirs(bench_dir, exist_ok=True)
+                bench_path = os.path.join(bench_dir, "benchmark_data.json")
                 with open(bench_path, "w", encoding="utf-8") as f:
-                    json.dump(base_payload, f, indent=2)
+                    json.dump(benchmark_data, f, indent=2)
+                _emit(f"[DEBUG] Wrote benchmark_data.json at {bench_path}")
 
-                socketio.emit("status", {
-                    "message": "Real benchmark completed",
-                    "type": "complete"
-                }, to=upload_id)
+                _emit("Real benchmark completed", "complete")
 
             except Exception as e:
-                socketio.emit("status", {
-                    "type": "error",
-                    "message": f"Real benchmark failed: {e}"
-                }, to=upload_id)
+                _emit(f"[DEBUG] Real benchmark failed: {e}", "error")
+                _emit(traceback.format_exc(), "error")
 
-        # Start the sync background task
         socketio.start_background_task(process)
+
+
+
+
 

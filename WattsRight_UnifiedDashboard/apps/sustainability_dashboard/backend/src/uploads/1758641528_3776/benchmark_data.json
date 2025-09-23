@@ -1,0 +1,78 @@
+{
+  "model": "sureshs/distilbert-large-sms-spam",
+  "threshold": 6.5,
+  "gpu": "NVIDIA GeForce RTX 3060",
+  "location": "france",
+  "originalParameters": 66955010,
+  "prunedParameters": 18215550,
+  "overall": {
+    "accuracy": {
+      "original": 0.628,
+      "pruned": 0.628
+    },
+    "precision": {
+      "original": 0.7866972477064221,
+      "pruned": 0.7866972477064221
+    },
+    "recall": {
+      "original": 0.628,
+      "pruned": 0.628
+    },
+    "f1Score": {
+      "original": 0.5682531429314218,
+      "pruned": 0.5682531429314218
+    }
+  },
+  "perClass": {
+    "0": {
+      "accuracy": {
+        "original": 0.256,
+        "pruned": 0.256
+      },
+      "precision": {
+        "original": 1.0,
+        "pruned": 1.0
+      },
+      "recall": {
+        "original": 0.256,
+        "pruned": 0.256
+      },
+      "f1Score": {
+        "original": 0.40764331210191085,
+        "pruned": 0.40764331210191085
+      }
+    },
+    "1": {
+      "accuracy": {
+        "original": 1.0,
+        "pruned": 1.0
+      },
+      "precision": {
+        "original": 1.0,
+        "pruned": 1.0
+      },
+      "recall": {
+        "original": 1.0,
+        "pruned": 1.0
+      },
+      "f1Score": {
+        "original": 1.0,
+        "pruned": 1.0
+      }
+    }
+  },
+  "realBenchmark": {
+    "device": "NVIDIA GeForce RTX 3060",
+    "elapsedSec": 16.015729299993836,
+    "samples": 1000,
+    "throughputSamplesPerSec": 62.43861776562275,
+    "avgGpuPowerW": 28.851599999999998,
+    "energyJoules": 462.07941547170213,
+    "metrics": {
+      "accuracy": 0.628,
+      "f1_score": 0.5682531429314218,
+      "precision": 0.7866972477064221,
+      "recall": 0.628
+    }
+  }
+}

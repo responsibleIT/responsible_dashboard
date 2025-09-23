@@ -1,25 +1,27 @@
-<div class="metrics-cards">
+<div *ngIf="metrics as m" class="metrics-cards">
   <app-benchmark-metric-card
-    [metric]="metrics?.power"
+    *ngIf="m.power as pow"
+    [metric]="pow"
     [type]="'power'"
-    [decimalFormat]="'1.6'"
-    [scientificNotation]="true"
-  />
+    [scientificNotation]="true">
+  </app-benchmark-metric-card>
+
   <app-benchmark-metric-card
-    [metric]="metrics?.performance"
-    [type]="'performance'"
-    [decimalFormat]="'1.1-1'"
-  />
+    *ngIf="m.performance as perf"
+    [metric]="perf"
+    [type]="'performance'">
+  </app-benchmark-metric-card>
+
   <app-benchmark-metric-card
-    [metric]="metrics?.emissions"
+    *ngIf="m.emissions as emi"
+    [metric]="emi"
     [type]="'emissions'"
-    [decimalFormat]="'1.8'"
-    [scientificNotation]="true"
-  />
+    [scientificNotation]="true">
+  </app-benchmark-metric-card>
+
   <app-benchmark-metric-card
-    [metric]="metrics?.compute"
-    [type]="'compute'"
-    [decimalFormat]="'1.4'"
-    [scientificNotation]="true"
-  />
+    *ngIf="m.compute as comp"
+    [metric]="comp"
+    [type]="'compute'">
+  </app-benchmark-metric-card>
 </div>

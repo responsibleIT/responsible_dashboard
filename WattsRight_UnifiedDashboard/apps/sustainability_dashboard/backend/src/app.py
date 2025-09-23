@@ -13,6 +13,8 @@ from werkzeug.utils import secure_filename
 from websocket import websocket_handlers
 from utils.metrics import calculate_power_consumption, calculate_emissions
 from demo import BenchmarkDataError, get_benchmark_from_csv
+import numpy as np
+
 
 # ---- constants / paths ----
 DEMO_MODE = "false"  # os.getenv("DEMO", "false").lower() == "true"
@@ -286,21 +288,19 @@ def get_benchmark_data(upload_id):
 
     resp = {
         "model": model,
-        "gpu": gpu_label,          # <- shows “NVIDIA GeForce RTX 3060” in UI
+        "gpu": gpu_label,
         "location": location,
         "threshold": threshold,
-        "overall": {
-            "accuracy": {
-                "original": overall.get("accuracy") or 0.0,
-                "pruned":   overall.get("accuracy") or 0.0,
-            }
-        },
+        "overall": data.get("overall", {}),
+        "perClass": data.get("perClass", {}),   # <-- ADD THIS
+        "originalParameters": data.get("originalParameters"),
+        "prunedParameters": data.get("prunedParameters"),
         "metricCards": {
             "power":      {"original": kwh_per_1000,       "pruned": kwh_per_1000},
             "emissions":  {"original": emissions_per_1000, "pruned": emissions_per_1000},
             "performance":{"original": (overall.get("accuracy") or 0.0) * 100.0,
-                           "pruned":   (overall.get("accuracy") or 0.0) * 100.0},
-            "compute":    {"original": None,               "pruned": None},  # unknown
+                        "pruned":   (overall.get("accuracy") or 0.0) * 100.0},
+            "compute":    {"original": None, "pruned": None},
         },
         "realBenchmark": rb
     }

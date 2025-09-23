@@ -1,102 +1,69 @@
-import {Component, Input, OnChanges, SimpleChanges} from '@angular/core';
-import {BenchmarkMetricCard} from '@app/types/pruning.types';
-import {MetricColor, MetricColorScheme} from '@app/types/metric.types';
-import {SettingsService} from '@app/services/settings.service';
-import {DecimalPipe, JsonPipe, NgIf, UpperCasePipe} from '@angular/common';
+import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { UpperCasePipe, DecimalPipe, NgIf } from '@angular/common';
+import { BenchmarkMetric } from '@app/types/benchmark.types';
+
+type ChangeType = 'positive' | 'negative' | 'neutral';
 
 @Component({
   selector: 'app-benchmark-metric-card',
-  imports: [
-    UpperCasePipe,
-    DecimalPipe,
-    NgIf,
-    JsonPipe
-  ],
-  providers: [DecimalPipe],
+  standalone: true,
+  imports: [UpperCasePipe, DecimalPipe, NgIf],
   templateUrl: './benchmark-metric-card.component.html',
   styleUrls: ['./benchmark-metric-card.component.scss']
 })
 export class BenchmarkMetricCardComponent implements OnChanges {
-
-  @Input() type: 'power' | 'performance' | 'emissions' | 'compute';
-  @Input() metric: BenchmarkMetricCard | undefined;
-  @Input() decimalFormat: string = '1.0-2';
+  @Input() metric: BenchmarkMetric | null = null;
   @Input() scientificNotation = false;
+  @Input() type: 'power' | 'performance' | 'emissions' | 'compute' = 'performance';
 
-  public percentageChange: number | undefined;
-  public changeType: 'positive' | 'negative' | 'neutral' | undefined;
-  public changeIcon: string | undefined;
-  public originalValue: string | undefined;
-  public prunedValue: string | undefined;
+  originalValue: string | number = 0;
+  prunedValue: string | number = 0;
 
-  ngOnChanges(changes: SimpleChanges) {
-    if (changes.metric) {
+  percentageChange = 0;
+  changeType: ChangeType = 'neutral';
+  changeIcon = '→';
 
-      const metric = changes.metric.currentValue as BenchmarkMetricCard;
-      const originalValue = metric.original ?? 0;
-      const prunedValue = metric.pruned ?? 0;
-      this.percentageChange = originalValue === 0 ? 0 : ((prunedValue - originalValue) / originalValue) * 100;
-      this.changeType = Math.abs(this.percentageChange) < 0.01 ? 'neutral' : (this.percentageChange > 0 ? 'positive' : 'negative');
-      this.changeIcon = this.changeType === 'positive' ? '↑' : (this.changeType === 'negative' ? '↓' : '→');
-
-      if (this.scientificNotation) {
-        this.originalValue = metric.original.toExponential(2);
-        this.prunedValue = metric.pruned.toExponential(2);
-        return
-      }
-
-      this.originalValue = this.decimalPipe.transform(metric.original, this.decimalFormat) || '0';
-      this.prunedValue = this.decimalPipe.transform(metric.pruned, this.decimalFormat) || '0';
-    }
-  }
-
-  private colorScheme: MetricColorScheme = {
-    power: {
-      header: '#6B21A8',
-      value: '#663EB6',
-      background: '#EFE2FE'
-    },
-    performance: {
-      header: '#166534',
-      value: '#05DBAC',
-      background: '#CBFDEC'
-    },
-    emissions: {
-      header: '#9A3412',
-      value: '#EE8438',
-      background: '#FFE6BD'
-    },
-    compute: {
-      header: '#991B1B',
-      value: '#FE17B0',
-      background: '#FEDBEE'
-    }
+  private colorScheme = {
+    power:        { header: '#6B21A8', value: '#663EB6', background: '#EFE2FE' },
+    performance:  { header: '#166534', value: '#05DBAC', background: '#CBFDEC' },
+    emissions:    { header: '#9A3412', value: '#EE8438', background: '#FFE6BD' },
+    compute:      { header: '#991B1B', value: '#FE17B0', background: '#FEDBEE' }
   };
 
-  constructor(
-    private readonly settingsService: SettingsService,
-    private decimalPipe: DecimalPipe
-  ) {
-  }
+  get color() { return this.colorScheme[this.type]; }
 
-  get color(): MetricColor {
-    return this.colorScheme[this.type];
-  }
+  ngOnChanges(_: SimpleChanges): void {
+    if (!this.metric) {
+      this.originalValue = 0;
+      this.prunedValue = 0;
+      this.percentageChange = 0;
+      this.changeType = 'neutral';
+      this.changeIcon = '→';
+      return;
+    }
 
-  // Helper method to get percentage change color
-  getPercentageChangeColor(changeType: 'positive' | 'negative' | 'neutral' | null): string {
-    // For some metrics, positive change might be bad (e.g., power, emissions)
-    // For others, positive change might be good (e.g., performance)
-    const isGoodMetric = this.type === 'performance'; // performance is good when it increases
+    const orig = this.metric.original ?? 0;
+    const prun = this.metric.pruned ?? 0;
 
-    switch (changeType) {
-      case 'positive':
-        return isGoodMetric ? '#16A34A' : '#DC2626'; // Green for good, red for bad
-      case 'negative':
-        return isGoodMetric ? '#DC2626' : '#16A34A'; // Red for good metrics going down, green for bad metrics going down
-      default:
-        return '#6B7280'; // Gray for neutral
+    this.originalValue = this.scientificNotation ? orig.toExponential(2) : orig;
+    this.prunedValue   = this.scientificNotation ? prun.toExponential(2) : prun;
+
+    if (orig > 0) {
+      this.percentageChange = ((prun - orig) / orig) * 100;
+      if (Math.abs(this.percentageChange) < 0.01) {
+        this.changeType = 'neutral'; this.changeIcon = '→';
+      } else if (this.percentageChange > 0) {
+        this.changeType = 'positive'; this.changeIcon = '↑';
+      } else {
+        this.changeType = 'negative'; this.changeIcon = '↓';
+      }
     }
   }
 
+  getPercentageChangeColor(): string {
+    const isGood = this.type === 'performance';
+    if (this.changeType === 'positive') return isGood ? '#16A34A' : '#DC2626';
+    if (this.changeType === 'negative') return isGood ? '#DC2626' : '#16A34A';
+    return '#6B7280';
+  }
 }
