@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { WebsocketService } from '@app/services/websocket.service';
 import { SettingsService } from '@app/services/settings.service';
 import { UploadService } from '@app/services/upload.service';
+import { BenchmarkService } from '@app/services/benchmark.service';
 
 @Component({
   selector: 'app-benchmark-loader',
@@ -24,6 +25,7 @@ export class BenchmarkLoaderComponent implements OnInit, OnDestroy {
     private readonly websocketService: WebsocketService,
     private readonly uploadService: UploadService,
     private readonly settingsService: SettingsService,
+    private readonly benchmarkService: BenchmarkService
   ) {}
 
   ngOnInit() {
@@ -38,6 +40,12 @@ export class BenchmarkLoaderComponent implements OnInit, OnDestroy {
       this.router.navigate(['/']);
       return;
     }
+
+    // ✅ save globally for resolver
+    this.benchmarkService.setUploadId(uploadId); // 👈 stash it for the resolver
+
+    // 2. Open websocket with explicit id
+    this.websocketService.connect(uploadId);
 
     // 2. Open websocket with explicit id (this sets internal state inside the service)
     this.websocketService.connect(uploadId);

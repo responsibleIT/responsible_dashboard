@@ -8,19 +8,23 @@ import { environment } from '@env/environment';
   providedIn: 'root'
 })
 export class BenchmarkService {
-
   private readonly apiUrl = `${environment.api.schema}://${environment.api.hostname}`;
-  private currentUploadId: string | null = null;  // 👈 stash last upload id
+  private currentUploadId: string | null = null;
 
   public data$ = new BehaviorSubject<BenchmarkData | null>(null);
 
-  constructor(
-    private http: HttpClient
-  ) { }
+  constructor(private http: HttpClient) {}
+
+  /** explicitly set the uploadId, so loader components can stash it */
+  public setUploadId(id: string | null): void {
+    this.currentUploadId = id;
+  }
 
   public fetchData(upload_id: string): Observable<BenchmarkData> {
-    this.currentUploadId = upload_id; // 👈 save it
-    return this.http.get(`${this.apiUrl}/benchmark/${upload_id}`).pipe(
+    // still keep the auto-stash behavior for safety
+    this.currentUploadId = upload_id;
+
+    return this.http.get<BenchmarkData>(`${this.apiUrl}/benchmark/${upload_id}`).pipe(
       map(response => response as BenchmarkData),
       catchError(error => throwError(() => new Error('Error fetching benchmark: ' + error.message)))
     );
@@ -34,7 +38,6 @@ export class BenchmarkService {
     return this.data$.getValue();
   }
 
-  // 👇 expose for resolver
   public get uploadId(): string | null {
     return this.currentUploadId;
   }

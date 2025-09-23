@@ -1,0 +1,108 @@
+{
+  "model": "sureshs/distilbert-large-sms-spam",
+  "threshold": 3.0,
+  "gpu": "NVIDIA GeForce RTX 3060",
+  "location": "france",
+  "originalParameters": 66955010,
+  "prunedParameters": 35165970,
+  "metricCards": {
+    "power": {
+      "original": 0.00021741589571903314,
+      "pruned": 0.0002591396039719869
+    },
+    "performance": {
+      "original": 99.6,
+      "pruned": 95.8
+    },
+    "emissions": {
+      "original": 0.010870794785951658,
+      "pruned": 0.012956980198599347
+    },
+    "compute": {
+      "original": 0.002934294174874444,
+      "pruned": 0.002934294174874444
+    }
+  },
+  "overall": {
+    "accuracy": {
+      "original": 0.996,
+      "pruned": 0.958
+    },
+    "precision": {
+      "original": 0.996031746031746,
+      "pruned": 0.960950080515298
+    },
+    "recall": {
+      "original": 0.996,
+      "pruned": 0.958
+    },
+    "f1Score": {
+      "original": 0.995999935998976,
+      "pruned": 0.9579326923076924
+    }
+  },
+  "perClass": {
+    "0": {
+      "accuracy": {
+        "original": 1.0,
+        "pruned": 0.998
+      },
+      "precision": {
+        "original": 1.0,
+        "pruned": 1.0
+      },
+      "recall": {
+        "original": 1.0,
+        "pruned": 0.998
+      },
+      "f1Score": {
+        "original": 1.0,
+        "pruned": 0.998998998998999
+      }
+    },
+    "1": {
+      "accuracy": {
+        "original": 0.992,
+        "pruned": 0.918
+      },
+      "precision": {
+        "original": 1.0,
+        "pruned": 1.0
+      },
+      "recall": {
+        "original": 0.992,
+        "pruned": 0.918
+      },
+      "f1Score": {
+        "original": 0.9959839357429718,
+        "pruned": 0.9572471324296142
+      }
+    }
+  },
+  "realBenchmark": {
+    "device": "NVIDIA GeForce RTX 3060",
+    "elapsedSecOriginal": 31.795655300011276,
+    "elapsedSecPruned": 31.35866189999797,
+    "samples": 1000,
+    "throughputOriginal": 31.450837875942295,
+    "throughputPruned": 31.88911577888675,
+    "avgGpuPowerWOriginal": 24.616483516483516,
+    "avgGpuPowerWPruned": 29.749438202247187,
+    "energyJoulesOriginal": 782.6972245885194,
+    "energyJoulesPruned": 932.902574299153,
+    "tflopsPerCallOriginal": 0.002934294174874444,
+    "tflopsPerCallPruned": 0.002934294174874444,
+    "metricsOriginal": {
+      "accuracy": 0.996,
+      "f1_score": 0.995999935998976,
+      "precision": 0.996031746031746,
+      "recall": 0.996
+    },
+    "metricsPruned": {
+      "accuracy": 0.958,
+      "f1_score": 0.9579326923076924,
+      "precision": 0.960950080515298,
+      "recall": 0.958
+    }
+  }
+}
