@@ -27,6 +27,6 @@ export const routes: Routes = [
   {
     path: 'benchmark-results',
     component: BenchmarkResultsComponent,
-    resolve: { data: BenchmarkResolver },   // ✅ only here!
+    resolve: { benchmark: BenchmarkResolver },   // ✅ only here!
   },
 ];

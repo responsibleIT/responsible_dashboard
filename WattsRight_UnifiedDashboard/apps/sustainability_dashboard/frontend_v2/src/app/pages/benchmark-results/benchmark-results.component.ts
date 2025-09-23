@@ -5,7 +5,7 @@ import { BenchmarkService } from '@app/services/benchmark.service';
 import { CommonModule } from '@angular/common';
 import { WebsocketService } from '@app/services/websocket.service';
 import {BenchmarkDetailsComponent} from '@app/pages/benchmark-results/components/benchmark-details/benchmark-details.component';
-import {BenchmarkMetricCardList, ClassPerformance} from '@app/types/pruning.types';
+import {BenchmarkData, BenchmarkMetricCardList, ClassPerformance} from '@app/types/pruning.types';
 
 type Pair = { orig: number | null; pruned: number | null };
 
@@ -43,20 +43,20 @@ export class BenchmarkResultsComponent implements OnInit {
     private readonly ws: WebsocketService,
   ) {}
 
-  ngOnInit(): void {
-    this.route.data.subscribe(data => {
-      const resolved = data['benchmark'];
-
-      console.log('[BenchmarkResults] resolver delivered data', resolved);
-
-      if (resolved) {
-        this.hydrate(resolved);
-      } else {
-        console.error('[results] no benchmark data resolved');
-        this.router.navigateByUrl('/');
-      }
-    });
-  }
+  ngOnInit() {
+  this.route.data.subscribe((data) => {
+    const r = data['benchmark'] as BenchmarkData | null;
+    console.log('[BenchmarkResults] resolver delivered data', r);
+    if (r) {
+      this.hydrate(r);
+    } else {
+      console.error('[results] no benchmark data resolved');
+      // Optionally: navigate back to pruning-adjustments with the same upload_id
+      const upload_id = this.route.snapshot.queryParamMap.get('upload_id');
+      this.router.navigate(['/pruning-adjustments'], { queryParams: { upload_id } });
+    }
+  });
+}
 
   private hydrate(res: any): void {
   this.modelName = res?.model ?? res?.modelName ?? '—';

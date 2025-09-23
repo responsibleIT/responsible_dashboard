@@ -47,9 +47,6 @@ export class BenchmarkLoaderComponent implements OnInit, OnDestroy {
     // 2. Open websocket with explicit id
     this.websocketService.connect(uploadId);
 
-    // 2. Open websocket with explicit id (this sets internal state inside the service)
-    this.websocketService.connect(uploadId);
-
     // 3. Pull the other settings (they should already be set earlier in the flow)
     const threshold = this.settingsService.Threshold;
     const gpu = this.settingsService.Gpu;
