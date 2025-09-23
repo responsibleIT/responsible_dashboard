@@ -265,26 +265,55 @@ def get_benchmark_data(upload_id):
 
     model     = data.get("model", "model")
     threshold = data.get("threshold", 0)
-    gpu_label = data.get("gpu") or "Detected GPU"
+    gpu_label = data.get("gpu") or (data.get("realBenchmark") or {}).get("device") or "Detected GPU"
     location  = data.get("location") or "france"
-    ci = LOCATION_CARBON_MAPPING.get(location, 300)  # gCO2/kWh
+    ci        = LOCATION_CARBON_MAPPING.get(location, 300)  # gCO2/kWh
 
-    rb = data.get("realBenchmark") or {}
-    samples   = rb.get("samples")
-    energy_j  = rb.get("energyJoules")
-    elapsed   = rb.get("elapsedSec")
-    avg_watts = rb.get("avgGpuPowerW")
-    tput      = rb.get("throughputSamplesPerSec")
-    overall   = rb.get("metrics") or {}
+    # Prefer what benchmark_real already saved
+    metric_cards = data.get("metricCards")
 
-    # Power per 1000 calls (prefer total energy)
-    kwh_per_1000 = None
-    if energy_j and samples and samples > 0:
-        kwh_per_1000 = (energy_j / samples) / 3_600_000.0 * 1000.0
-    elif avg_watts and tput and tput > 0:
-        kwh_per_1000 = ((avg_watts / tput) / 3_600_000.0) * 1000.0
+    # If not present, compute from the new realBenchmark fields
+    if not metric_cards:
+        rb = data.get("realBenchmark") or {}
+        samples = rb.get("samples") or 0
 
-    emissions_per_1000 = (kwh_per_1000 * ci) if kwh_per_1000 is not None else None
+        # Energy → kWh per 1000 calls (prefer direct energy totals)
+        kwh_orig = kwh_prun = None
+        if samples and rb.get("energyJoulesOriginal") is not None and rb.get("energyJoulesPruned") is not None:
+            kwh_orig = (rb["energyJoulesOriginal"] / samples) / 3_600_000.0 * 1000.0
+            kwh_prun = (rb["energyJoulesPruned"]   / samples) / 3_600_000.0 * 1000.0
+        else:
+            # Fallback: avg power + throughput
+            avgW_o = rb.get("avgGpuPowerWOriginal")
+            avgW_p = rb.get("avgGpuPowerWPruned")
+            tput_o = rb.get("throughputOriginal")
+            tput_p = rb.get("throughputPruned")
+            if avgW_o and tput_o:
+                kwh_orig = ((avgW_o / tput_o) / 3_600_000.0) * 1000.0
+            if avgW_p and tput_p:
+                kwh_prun = ((avgW_p / tput_p) / 3_600_000.0) * 1000.0
+
+        # Emissions per 1000 from kWh
+        gco2_orig = (kwh_orig * ci) if kwh_orig is not None else None
+        gco2_prun = (kwh_prun * ci) if kwh_prun is not None else None
+
+        # Performance % from data["overall"]
+        ov = data.get("overall") or {}
+        acc_o = (ov.get("accuracy") or {}).get("original")
+        acc_p = (ov.get("accuracy") or {}).get("pruned")
+        perf_o = (acc_o * 100.0) if isinstance(acc_o, (int, float)) else None
+        perf_p = (acc_p * 100.0) if isinstance(acc_p, (int, float)) else None
+
+        # TFLOPs per call from new fields
+        tflops_o = rb.get("tflopsPerCallOriginal")
+        tflops_p = rb.get("tflopsPerCallPruned")
+
+        metric_cards = {
+            "power":       {"original": kwh_orig,  "pruned": kwh_prun},
+            "emissions":   {"original": gco2_orig, "pruned": gco2_prun},
+            "performance": {"original": perf_o,    "pruned": perf_p},
+            "compute":     {"original": tflops_o,  "pruned": tflops_p},
+        }
 
     resp = {
         "model": model,
@@ -292,17 +321,11 @@ def get_benchmark_data(upload_id):
         "location": location,
         "threshold": threshold,
         "overall": data.get("overall", {}),
-        "perClass": data.get("perClass", {}),   # <-- ADD THIS
+        "perClass": data.get("perClass", {}),
         "originalParameters": data.get("originalParameters"),
         "prunedParameters": data.get("prunedParameters"),
-        "metricCards": {
-            "power":      {"original": kwh_per_1000,       "pruned": kwh_per_1000},
-            "emissions":  {"original": emissions_per_1000, "pruned": emissions_per_1000},
-            "performance":{"original": (overall.get("accuracy") or 0.0) * 100.0,
-                        "pruned":   (overall.get("accuracy") or 0.0) * 100.0},
-            "compute":    {"original": None, "pruned": None},
-        },
-        "realBenchmark": rb
+        "metricCards": metric_cards,
+        "realBenchmark": data.get("realBenchmark", {})
     }
     return jsonify(resp)
 
