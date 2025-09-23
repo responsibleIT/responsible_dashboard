@@ -75,10 +75,11 @@ export class UploadLoaderComponent implements OnInit, OnDestroy {
 
     this.sub.add(
       messages$.subscribe((msg: WsMsg) => {
-        // You can surface live text if you emit {message: "..."} from the backend
         if (msg?.message) this.message = msg.message;
 
-        if (msg?.type === 'complete') {
+        // Only treat "upload-complete" as success in the upload loader
+        if (msg?.type === 'upload-complete') {
+          console.log('[upload-loader] upload complete, moving to pruning adjustments!');
           this.router.navigate(['/pruning-adjustments']);
         } else if (msg?.type === 'error') {
           this.message = msg.message ?? 'An error occurred.';

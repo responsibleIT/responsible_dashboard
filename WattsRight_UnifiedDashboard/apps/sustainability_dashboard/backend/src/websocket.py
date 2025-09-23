@@ -278,7 +278,7 @@ def websocket_handlers(socketio):
                 model_copy = copy.deepcopy(model)
                 pruned_model, model_info = disable_low_weight_neurons(model_copy, 10)
 
-                socketio.emit("status", {"message": "Benchmarking model..."}, to=upload_id)
+                socketio.emit("status", {"message": "Predicting model values..."}, to=upload_id)
 
                 started_at = time.perf_counter()
                 def progress_cb(done, total):
@@ -317,8 +317,8 @@ def websocket_handlers(socketio):
                 save_json_file(upload_id, "label_mapping.json", label_mapping)
 
                 socketio.emit("status", {
-                    "message": f"Benchmark completed successfully for {model_name_for_logs}",
-                    "type": "complete"
+                    "message": f"Upload & pruning setup completed for {model_name_for_logs}",
+                    "type": "upload-complete"
                 }, to=upload_id)
 
             except Exception as e:
@@ -676,7 +676,8 @@ def websocket_handlers(socketio):
                     json.dump(benchmark_data, f, indent=2)
                 _emit(f"[DEBUG] Wrote benchmark_data.json at {bench_path}")
 
-                _emit("Real benchmark completed", "complete")
+                # in handle_benchmark_real
+                _emit("Real benchmark completed", "benchmark-complete")
 
             except Exception as e:
                 _emit(f"[DEBUG] Real benchmark failed: {e}", "error")

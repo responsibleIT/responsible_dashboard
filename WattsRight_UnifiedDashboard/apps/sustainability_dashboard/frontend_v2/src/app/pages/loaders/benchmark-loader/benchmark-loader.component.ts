@@ -66,7 +66,7 @@ export class BenchmarkLoaderComponent implements OnInit, OnDestroy {
       this.websocketService.getMessages().subscribe(msg => {
         if (msg.type === 'loading' && msg.message) {
           this.message = msg.message;
-        } else if (msg.type === 'complete') {
+        } else if (msg?.type === 'benchmark-complete') {
           this.message = msg.message || 'Benchmark complete.';
           setTimeout(() => {
             this.router.navigate(['/benchmark-results'], {
