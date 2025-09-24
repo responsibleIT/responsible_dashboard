@@ -1,4 +1,5 @@
 import os
+import signal
 import sys
 import time
 import random
@@ -340,6 +341,11 @@ def export_model(upload_id):
         return send_file(zip_path, as_attachment=True, download_name="pruned_model.zip")
     except Exception as e:
         return {"error": str(e)}, 500
+
+@app.route("/shutdown", methods=["POST"])
+def shutdown():
+    os.kill(os.getpid(), signal.SIGINT)
+    return "Shutting down..."
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')

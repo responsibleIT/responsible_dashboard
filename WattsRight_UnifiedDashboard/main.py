@@ -29,10 +29,15 @@ def _get_pyi_splash():
 
 pyi_splash = _get_pyi_splash()
 
-def splash_update(msg: str):
+def splash_update(msg: str, color: str = "black", bold: bool = False):
+    """Update splash text with optional color and bold style."""
     if pyi_splash:
         try:
-            pyi_splash.update_text(msg)
+            styled = msg
+            if bold:
+                styled = f"<b>{styled}</b>"
+            styled = f"<span fgcolor='{color}'>{styled}</span>"
+            pyi_splash.update_text(styled)
         except Exception:
             pass
 
@@ -123,9 +128,10 @@ FRONTPAGE_HTML = resource_path("frontpage/index.html")
 
 def parent_main() -> int:
     # ensure uploads dir exists next to exe (or current working dir)
-    UPLOADS_DIR = Path(sys.executable).resolve().parent / "uploads"
+    UPLOADS_DIR = Path("uploads")
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Uploads directory ready at: {UPLOADS_DIR.resolve()}", flush=True)
+
     print("Resolved paths:", flush=True)
     print(f"  Fairness script:        {FAIRNESS_SCRIPT}", flush=True)
     print(f"  Sustainability script:  {SUSTAINABILITY_SCRIPT}", flush=True)
@@ -138,14 +144,16 @@ def parent_main() -> int:
     if not Path(SUSTAINABILITY_SCRIPT).is_file():  missing.append(SUSTAINABILITY_SCRIPT)
     if not Path(FRONTPAGE_HTML).is_file():         missing.append(FRONTPAGE_HTML)
     if missing:
-        print("Missing required files in the bundle:")
+        splash_update("Missing files!", color="red", bold=True)
+        print("Missing required files in the bundle:", flush=True)
         for m in missing:
             print("  -", m)
-        print("Check your .spec datas section.")
         return 1
 
     # Start servers
+    splash_update("Launching servers...", color="blue", bold=True)
     print("Launching servers...", flush=True)
+
     fairness_proc = run_server(
         "FAIRNESS",
         FAIRNESS_SCRIPT,
@@ -160,13 +168,22 @@ def parent_main() -> int:
     )
 
     # Splash / progress
-    splash_update("Starting services...")
+    splash_update("Waiting for Fairness dashboard...", color="blue")
     ok1 = wait_for_server(5000, "Fairness dashboard", timeout=40)
-    splash_update("Fairness ready. Starting sustainability...")
+    if ok1:
+        splash_update("Fairness ready", color="green", bold=True)
+    else:
+        splash_update("Fairness failed", color="red", bold=True)
+
+    splash_update("Waiting for Sustainability dashboard...", color="blue")
     ok2 = wait_for_server(8000, "Sustainability dashboard", timeout=40)
+    if ok2:
+        splash_update("Sustainability ready", color="green", bold=True)
+    else:
+        splash_update("Sustainability failed", color="red", bold=True)
 
     if ok1 and ok2:
-        splash_update("Opening frontpage...")
+        splash_update("Opening frontpage...", color="green", bold=True)
         print("Opening frontpage...", flush=True)
         webbrowser.open(f"file:///{FRONTPAGE_HTML}")
         if pyi_splash:
@@ -175,6 +192,7 @@ def parent_main() -> int:
             except Exception:
                 pass
     else:
+        splash_update("Startup failed. Check logs.", color="red", bold=True)
         print("One or both servers failed to start. See logs in %TEMP%/wattsright_logs.", flush=True)
         if pyi_splash:
             try:

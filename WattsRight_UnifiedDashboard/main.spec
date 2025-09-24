@@ -76,14 +76,23 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# ---- Splash object ----
+splash = Splash(
+    image_file='splashscreen.png',
+    binaries=a.binaries,
+    datas=a.datas,
+    text_pos=(10, 10),        # optional: position for text updates
+    minify_script=True
+)
+
 exe = EXE(
     pyz,
     a.scripts, a.binaries, a.zipfiles, a.datas,
-    name='main',
+    name='WattsRightDashboard',
     debug=False,
     strip=False,
     upx=True,
     console=False,                 # keep True while testing
-    splash='splashscreen.png',    # PyInstaller splash
-    onefile=True                  # <-- this forces single-file build
+    splash=[splash],                 # PyInstaller splash
+    onefile=True                   # <-- this forces single-file build
 )

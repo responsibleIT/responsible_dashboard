@@ -36,3 +36,9 @@
     </footer>
   </body>
 </html>
+<script>
+  window.addEventListener("beforeunload", () => {
+    fetch("http://127.0.0.1:5000/shutdown", { method: "POST" }).catch(() => {});
+    fetch("http://127.0.0.1:8000/shutdown", { method: "POST" }).catch(() => {});
+  });
+</script>

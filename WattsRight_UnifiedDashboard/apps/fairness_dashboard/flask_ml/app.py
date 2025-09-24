@@ -18,6 +18,7 @@ import uuid
 import time
 import gc
 import shutil
+import signal
 import json
 import math
 import pickle
@@ -168,6 +169,11 @@ def landing():
     session.pop('uploaded_metadata_file_path', None)
     session.pop('run_history', None); session.modified = True;
     return render_template('landing.html')
+
+@app.route("/shutdown", methods=["POST"])
+def shutdown():
+    os.kill(os.getpid(), signal.SIGINT)
+    return "Shutting down..."
 
 @app.route('/dashboard')
 def dashboard():
