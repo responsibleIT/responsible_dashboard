@@ -342,12 +342,13 @@ def export_model(upload_id):
     except Exception as e:
         return {"error": str(e)}, 500
 
-@app.route("/shutdown", methods=["POST"])
+@app.route('/shutdown', methods=['POST'])
 def shutdown():
-    func = request.environ.get("werkzeug.server.shutdown")
+    func = request.environ.get('werkzeug.server.shutdown')
     if func:
         func()
-    return "Shutting down..."
+    os._exit(0)   # <-- forcefully end Python process
+    return 'Server shutting down...'
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')

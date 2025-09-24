@@ -81,9 +81,9 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 splash = Splash("splashscreen.png",
     binaries=a.binaries,
     datas=a.datas,
-    text_pos=(20, 300),
+    text_pos=(20, 100),
     text_size=20,
-    text_color='white'
+    text_color='black'
 )
 
 exe = EXE(

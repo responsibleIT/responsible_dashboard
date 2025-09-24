@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask_cors import CORS
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
@@ -31,6 +32,7 @@ app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key-onboarding-v2-' + str(uuid.uuid4()))
 app.config['UPLOAD_FOLDER'] = 'uploads'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+CORS(app)
 
 # --- Constants ---
 # For budgetting "parameters" change the N_Permutation_repeats, jobs, min samples or importance size below.
@@ -170,12 +172,13 @@ def landing():
     session.pop('run_history', None); session.modified = True;
     return render_template('landing.html')
 
-@app.route("/shutdown", methods=["POST"])
+@app.route('/shutdown', methods=['POST'])
 def shutdown():
-    func = request.environ.get("werkzeug.server.shutdown")
+    func = request.environ.get('werkzeug.server.shutdown')
     if func:
         func()
-    return "Shutting down..."
+    os._exit(0)   # <-- forcefully end Python process
+    return 'Server shutting down...'
 
 @app.route('/dashboard')
 def dashboard():
