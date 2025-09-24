@@ -122,6 +122,10 @@ SUSTAINABILITY_SCRIPT = str(Path(SUSTAINABILITY_DIR) / "app.py")
 FRONTPAGE_HTML = resource_path("frontpage/index.html")
 
 def parent_main() -> int:
+    # ensure uploads dir exists next to exe (or current working dir)
+    UPLOADS_DIR = Path(sys.executable).resolve().parent / "uploads"
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"Uploads directory ready at: {UPLOADS_DIR.resolve()}", flush=True)
     print("Resolved paths:", flush=True)
     print(f"  Fairness script:        {FAIRNESS_SCRIPT}", flush=True)
     print(f"  Sustainability script:  {SUSTAINABILITY_SCRIPT}", flush=True)

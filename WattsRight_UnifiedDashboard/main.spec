@@ -27,13 +27,8 @@ datas = [
     ('frontpage/index.html', 'frontpage'),
     ('frontpage/public', 'frontpage/public'),
 
-    # Ensure uploads dir exists at runtime
-    ('uploads', 'uploads'),
-
     # ===== Fairness dashboard =====
-    # Entire folder (templates/static/etc.)
     ('apps/fairness_dashboard/flask_ml', 'apps/fairness_dashboard/flask_ml'),
-    # Explicitly add app.py so our runtime path check can never miss it
     ('apps/fairness_dashboard/flask_ml/app.py', 'apps/fairness_dashboard/flask_ml'),
 
     # ===== Sustainability backend =====
@@ -88,6 +83,7 @@ exe = EXE(
     debug=False,
     strip=False,
     upx=True,
-    console=True,                 # keep True while testing
+    console=False,                 # keep True while testing
     splash='splashscreen.png',    # PyInstaller splash
+    onefile=True                  # <-- this forces single-file build
 )
