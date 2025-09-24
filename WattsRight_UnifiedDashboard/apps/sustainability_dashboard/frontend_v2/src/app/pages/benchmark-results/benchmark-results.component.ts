@@ -6,17 +6,20 @@ import { CommonModule } from '@angular/common';
 import { WebsocketService } from '@app/services/websocket.service';
 import {BenchmarkDetailsComponent} from '@app/pages/benchmark-results/components/benchmark-details/benchmark-details.component';
 import {BenchmarkData, BenchmarkMetricCardList, ClassPerformance} from '@app/types/pruning.types';
+import {BenchmarkMenuLeftComponent} from '@app/pages/benchmark-results/components/benchmark-menu-left/benchmark-menu-left.component';
 
 type Pair = { orig: number | null; pruned: number | null };
 
 @Component({
   selector: 'app-benchmark-results',
   standalone: true,
-  imports: [CommonModule, BenchmarkDetailsComponent], // reuse existing detail components
+  imports: [CommonModule, BenchmarkDetailsComponent, BenchmarkMenuLeftComponent], // reuse existing detail components
   templateUrl: './benchmark-results.component.html',
   styleUrls: ['./benchmark-results.component.scss']
 })
 export class BenchmarkResultsComponent implements OnInit {
+  benchmarkData: BenchmarkData | null = null;
+
   cards: { power: Pair; performance: Pair; emissions: Pair; compute: Pair } = {
     power: { orig: null, pruned: null },
     performance: { orig: null, pruned: null },
@@ -59,62 +62,112 @@ export class BenchmarkResultsComponent implements OnInit {
   });
 }
 
-  private hydrate(res: any): void {
+private hydrate(res: any): void {
   this.modelName = res?.model ?? res?.modelName ?? '—';
   this.gpuLabel  = res?.gpu ?? res?.gpuLabel ?? '—';
   this.locationLabel = res?.location ?? res?.locationLabel ?? '—';
-  this.thresholdPct = typeof res?.threshold === 'number' ? Number(res.threshold) : (typeof res?.pruningThreshold === 'number' ? Number(res.pruningThreshold) : null);
+  this.thresholdPct = typeof res?.threshold === 'number'
+    ? Number(res.threshold)
+    : (typeof res?.pruningThreshold === 'number' ? Number(res.pruningThreshold) : null);
 
   // parameter counts if present
   this.originalParameters = this.n(res?.originalParameters) || this.n(res?.original_params) || null;
   this.prunedParameters   = this.n(res?.prunedParameters)   || this.n(res?.pruned_params)   || null;
 
-    const mc = res?.metricCards ?? {};
-    const pick = (k: string): Pair => ({ orig: this.n(mc?.[k]?.original), pruned: this.n(mc?.[k]?.pruned) });
-    this.cards.power       = pick('power');
-    this.cards.performance = pick('performance');
-    this.cards.emissions   = pick('emissions');
-    this.cards.compute     = pick('compute');
-    if (mc?.power) {
-      this.metricCards = {
-        power: { title: 'Power (per 1000 calls)', unit: 'kWh', original: mc.power.original, pruned: mc.power.pruned, change: (mc.power.pruned - mc.power.original) / (mc.power.original || 1) * 100 },
-        performance: { title: 'Accuracy', unit: '%', original: mc.performance.original, pruned: mc.performance.pruned, change: (mc.performance.pruned - mc.performance.original)/(mc.performance.original||1)*100 },
-        emissions: { title: 'Carbon (per 1000 calls)', unit: 'gCO₂', original: mc.emissions.original, pruned: mc.emissions.pruned, change: (mc.emissions.pruned - mc.emissions.original)/(mc.emissions.original||1)*100 },
-        compute: { title: 'Computing Power', unit: 'GFLOPS', original: mc.compute.original, pruned: mc.compute.pruned, change: (mc.compute.pruned - mc.compute.original)/(mc.compute.original||1)*100 }
-      };
-    }
+  const mc = res?.metricCards ?? {};
+  const pick = (k: string): Pair => ({ orig: this.n(mc?.[k]?.original), pruned: this.n(mc?.[k]?.pruned) });
+  this.cards.power       = pick('power');
+  this.cards.performance = pick('performance');
+  this.cards.emissions   = pick('emissions');
+  this.cards.compute     = pick('compute');
 
-    // compute size reduction percentage (based on compute or power if compute absent)
-    // size reduction: prefer explicit params if available, else fall back to compute/power heuristic
-    if (this.originalParameters && this.prunedParameters && this.originalParameters > 0) {
-      this.sizeReductionPct = (1 - (this.prunedParameters / this.originalParameters)) * 100;
-    } else {
-      const baseOrig = this.cards.compute.orig ?? this.cards.power.orig;
-      const basePruned = this.cards.compute.pruned ?? this.cards.power.pruned;
-      if (typeof baseOrig === 'number' && baseOrig > 0 && typeof basePruned === 'number') {
-        this.sizeReductionPct = (1 - (basePruned / baseOrig)) * 100;
-      } else {
-        this.sizeReductionPct = null;
+  if (mc?.power) {
+    this.metricCards = {
+      power: {
+        title: 'Power (per 1000 calls)',
+        unit: 'kWh',
+        original: mc.power.original,
+        pruned: mc.power.pruned,
+        change: (mc.power.pruned - mc.power.original) / (mc.power.original || 1) * 100
+      },
+      performance: {
+        title: 'Accuracy',
+        unit: '%',
+        original: mc.performance.original,
+        pruned: mc.performance.pruned,
+        change: (mc.performance.pruned - mc.performance.original) / (mc.performance.original || 1) * 100
+      },
+      emissions: {
+        title: 'Carbon (per 1000 calls)',
+        unit: 'gCO₂',
+        original: mc.emissions.original,
+        pruned: mc.emissions.pruned,
+        change: (mc.emissions.pruned - mc.emissions.original) / (mc.emissions.original || 1) * 100
+      },
+      compute: {
+        title: 'Computing Power',
+        unit: 'GFLOPS',
+        original: mc.compute.original,
+        pruned: mc.compute.pruned,
+        change: (mc.compute.pruned - mc.compute.original) / (mc.compute.original || 1) * 100
       }
-    }
+    };
+  }
 
-    // adapt to existing BenchmarkClassesComponent expects ClassPerformance[]: { className, performance }
-    if (res?.perClass && typeof res.perClass === 'object') {
-      const norm = (v: number | null): number => {
-        if (v === null) return 0;
-        return v > 1 ? v / 100 : v; // backend might return percentages (e.g., 74.6) we normalize to 0-1
-      };
-      this.classes = Object.entries(res.perClass).map(([className, perf]: [string, any]) => ({
-        className: className,
-        performance: {
-          accuracy: { original: norm(this.n(perf?.accuracy?.original)), pruned: norm(this.n(perf?.accuracy?.pruned)) },
-          precision: { original: norm(this.n(perf?.precision?.original)), pruned: norm(this.n(perf?.precision?.pruned)) },
-          recall: { original: norm(this.n(perf?.recall?.original)), pruned: norm(this.n(perf?.recall?.pruned)) },
-          f1Score: { original: norm(this.n(perf?.f1Score?.original ?? perf?.f1?.original)), pruned: norm(this.n(perf?.f1Score?.pruned ?? perf?.f1?.pruned)) }
-        }
-      }));
+  // compute size reduction percentage
+  if (this.originalParameters && this.prunedParameters && this.originalParameters > 0) {
+    this.sizeReductionPct = (1 - (this.prunedParameters / this.originalParameters)) * 100;
+  } else {
+    const baseOrig = this.cards.compute.orig ?? this.cards.power.orig;
+    const basePruned = this.cards.compute.pruned ?? this.cards.power.pruned;
+    if (typeof baseOrig === 'number' && baseOrig > 0 && typeof basePruned === 'number') {
+      this.sizeReductionPct = (1 - (basePruned / baseOrig)) * 100;
+    } else {
+      this.sizeReductionPct = null;
     }
   }
+
+  // ✅ build benchmarkData object for menu-left
+  this.benchmarkData = {
+    ...res,
+    reductionPercentage: this.sizeReductionPct ?? 0,
+    originalParameters: this.originalParameters ?? 0,
+    prunedParameters: this.prunedParameters ?? 0,
+    model: this.modelName,
+    gpu: this.gpuLabel,
+    location: this.locationLabel,
+    threshold: this.thresholdPct ?? 0
+  };
+
+  // class performances
+  if (res?.perClass && typeof res.perClass === 'object') {
+    const norm = (v: number | null): number => {
+      if (v === null) return 0;
+      return v > 1 ? v / 100 : v;
+    };
+    this.classes = Object.entries(res.perClass).map(([className, perf]: [string, any]) => ({
+      className: className,
+      performance: {
+        accuracy: {
+          original: norm(this.n(perf?.accuracy?.original)),
+          pruned: norm(this.n(perf?.accuracy?.pruned))
+        },
+        precision: {
+          original: norm(this.n(perf?.precision?.original)),
+          pruned: norm(this.n(perf?.precision?.pruned))
+        },
+        recall: {
+          original: norm(this.n(perf?.recall?.original)),
+          pruned: norm(this.n(perf?.recall?.pruned))
+        },
+        f1Score: {
+          original: norm(this.n(perf?.f1Score?.original ?? perf?.f1?.original)),
+          pruned: norm(this.n(perf?.f1Score?.pruned ?? perf?.f1?.pruned))
+        }
+      }
+    }));
+  }
+}
 
   // helpers
   n(v: unknown): number | null {

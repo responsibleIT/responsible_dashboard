@@ -1,25 +1,18 @@
 <div class="benchmark-results" *ngIf="metricCards; else loadingState">
   <aside class="sidebar">
-    <div class="sidebar-card">
-      <div class="sr-banner">
-        <div class="sr-label">SIZE REDUCTION</div>
-        <div class="sr-value">{{ sizeReductionPct ? (sizeReductionPct | number:'1.0-1') : '0.0' }}<span class="pct">%</span></div>
-      </div>
-      <div class="sr-body">
-        <div class="kv"><span>Original</span><strong>{{ originalParameters === null ? '—' : (originalParameters | number) }}</strong></div>
-        <div class="kv"><span>Pruned</span><strong>{{ prunedParameters === null ? '—' : (prunedParameters | number) }}<span class="green" *ngIf="sizeReductionPct"> ({{ sizeReductionPct | number:'1.0-1' }}%)</span></strong></div>
-        <div class="divider"></div>
-        <div class="kv"><span>Model</span><strong>{{ modelName }}</strong></div>
-        <div class="kv"><span>GPU</span><strong>{{ gpuLabel }}</strong></div>
-        <div class="kv"><span>Location</span><strong>{{ locationLabel }}</strong></div>
-        <div class="kv"><span>Threshold</span><strong>{{ thresholdPct === null ? '—' : (thresholdPct | number:'1.0-1') + '%' }}</strong></div>
-        <button class="btn-outline" (click)="goBack()">GO BACK AND CHANGE SETTINGS</button>
-        <button class="btn-solid" (click)="exportModel()">EXPORT MODEL</button>
-      </div>
-    </div>
+    <app-benchmark-menu-left
+      *ngIf="benchmarkData"
+      [data]="benchmarkData"
+      (export)="exportModel()"
+      (goBack)="goBack()">
+    </app-benchmark-menu-left>
   </aside>
+
   <section class="main">
-    <app-benchmark-details [metricCards]="metricCards" [classes]="classes"></app-benchmark-details>
+    <app-benchmark-details
+      [metricCards]="metricCards"
+      [classes]="classes">
+    </app-benchmark-details>
   </section>
 </div>
 

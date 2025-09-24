@@ -44,11 +44,15 @@
       <span class="label">Threshold</span>
       <span class="value">{{ data?.threshold | number: '1.1-1' }}%</span>
     </div>
-
-    <a href="/pruning-adjustments" class="btn-back">{{ 'Go back and change settings' | uppercase }}</a>
   </div>
 
   <div class="section">
-    <button appButton [ecogreen]="true" [fullWidth]="true">Export model</button>
+    <a class="btn-back" (click)="goBack.emit()">{{ 'Go back and change settings' | uppercase }}</a>
+  </div>
+
+  <div class="section">
+    <button appButton [ecogreen]="true" [fullWidth]="true" (click)="export.emit()">
+      Export model
+    </button>
   </div>
 </div>

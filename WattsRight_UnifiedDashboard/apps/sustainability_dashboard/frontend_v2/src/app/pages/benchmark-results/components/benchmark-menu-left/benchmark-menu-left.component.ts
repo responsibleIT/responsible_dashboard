@@ -1,4 +1,4 @@
-import {Component, Input} from '@angular/core';
+import {Component, EventEmitter, Input, Output} from '@angular/core';
 import {ButtonDirective} from "@app/domains/ui/directives/button/button.directive";
 import {FormInputSliderComponent} from "@app/domains/ui/components/forms/form-input-slider/form-input-slider.component";
 import {
@@ -23,6 +23,8 @@ import {BenchmarkData} from '@app/types/pruning.types';
 export class BenchmarkMenuLeftComponent {
 
   @Input() data!: BenchmarkData | undefined;
+  @Output() export = new EventEmitter<void>();
+  @Output() goBack = new EventEmitter<void>();
 
   public get changeColor(): string {
     const original = this.data?.originalParameters;
