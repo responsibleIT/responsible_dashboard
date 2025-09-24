@@ -17,6 +17,8 @@ from pruning import estimate_flops
 from benchmark import evaluate_model
 from predict import predict_with_auto_regressive_model
 from utils.gpu_power import sample_gpu_power_background
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+import shutil
 
 import glob
 
@@ -579,9 +581,9 @@ def websocket_handlers(socketio):
                 except Exception as e:
                     _emit(f"[DEBUG] FLOPs estimation failed: {e}")
 
-                # TFLOPs-per-call number for the card (fallback to param counts)
-                tflops_orig = (orig_flops / 1e12) if isinstance(orig_flops, (int, float)) else float(orig_params or 0)
-                tflops_prun = (pruned_flops / 1e12) if isinstance(pruned_flops, (int, float)) else float(prun_params or 0)
+                # 💡 Convert to GFLOPs-per-call (fallback to param counts)
+                gflops_orig = (orig_flops / 1e9) if isinstance(orig_flops, (int, float)) else float(orig_params or 0)
+                gflops_prun = (pruned_flops / 1e9) if isinstance(pruned_flops, (int, float)) else float(prun_params or 0)
 
                 # 6) Cards: kWh & gCO2 per 1000 calls, accuracy %, TFLOPs --------
                 loc = (data or {}).get("location") or "france"
@@ -607,8 +609,8 @@ def websocket_handlers(socketio):
                         "pruned":   float(gco2_prun_per_1k),
                     },
                     "compute": {
-                        "original": float(tflops_orig),
-                        "pruned":   float(tflops_prun),
+                        "original": float(gflops_orig),
+                        "pruned":   float(gflops_prun),
                     }
                 }
                 _emit(f"[DEBUG] metricCards: {metric_cards}")
@@ -661,8 +663,8 @@ def websocket_handlers(socketio):
                         "avgGpuPowerWPruned":   float(avg_watts_pruned),
                         "energyJoulesOriginal": float(energy_j_orig),
                         "energyJoulesPruned":   float(energy_j_pruned),
-                        "tflopsPerCallOriginal": float(tflops_orig),
-                        "tflopsPerCallPruned":   float(tflops_prun),
+                        "tflopsPerCallOriginal": float(gflops_orig),
+                        "tflopsPerCallPruned":   float(gflops_prun),
                         "metricsOriginal": orig_metrics.get("overall", {}),
                         "metricsPruned":   pruned_metrics.get("overall", {}),
                     }
@@ -675,6 +677,20 @@ def websocket_handlers(socketio):
                 with open(bench_path, "w", encoding="utf-8") as f:
                     json.dump(benchmark_data, f, indent=2)
                 _emit(f"[DEBUG] Wrote benchmark_data.json at {bench_path}")
+
+                pruned_model_dir = os.path.join(get_upload_path(upload_id), "pruned_model_hf")
+                try:
+                    os.makedirs(pruned_model_dir, exist_ok=True)
+                    # Save pruned model + tokenizer in HuggingFace format
+                    pruned_model.save_pretrained(pruned_model_dir)
+                    tokenizer.save_pretrained(pruned_model_dir)
+
+                    # Zip the directory
+                    zip_path = pruned_model_dir + ".zip"
+                    shutil.make_archive(pruned_model_dir, "zip", pruned_model_dir)
+                    _emit(f"[DEBUG] Saved HuggingFace pruned model at {zip_path}")
+                except Exception as e:
+                    _emit(f"[DEBUG] Failed to save HuggingFace pruned model: {e}", "error")
 
                 # in handle_benchmark_real
                 _emit("Real benchmark completed", "benchmark-complete")

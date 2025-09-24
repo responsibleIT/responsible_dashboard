@@ -41,6 +41,7 @@ export class BenchmarkResultsComponent implements OnInit {
     private readonly router: Router,
     private readonly route: ActivatedRoute,
     private readonly ws: WebsocketService,
+    private readonly benchmarkService: BenchmarkService
   ) {}
 
   ngOnInit() {
@@ -79,7 +80,7 @@ export class BenchmarkResultsComponent implements OnInit {
         power: { title: 'Power (per 1000 calls)', unit: 'kWh', original: mc.power.original, pruned: mc.power.pruned, change: (mc.power.pruned - mc.power.original) / (mc.power.original || 1) * 100 },
         performance: { title: 'Accuracy', unit: '%', original: mc.performance.original, pruned: mc.performance.pruned, change: (mc.performance.pruned - mc.performance.original)/(mc.performance.original||1)*100 },
         emissions: { title: 'Carbon (per 1000 calls)', unit: 'gCO₂', original: mc.emissions.original, pruned: mc.emissions.pruned, change: (mc.emissions.pruned - mc.emissions.original)/(mc.emissions.original||1)*100 },
-        compute: { title: 'Computing Power', unit: 'TFLOPS', original: mc.compute.original, pruned: mc.compute.pruned, change: (mc.compute.pruned - mc.compute.original)/(mc.compute.original||1)*100 }
+        compute: { title: 'Computing Power', unit: 'GFLOPS', original: mc.compute.original, pruned: mc.compute.pruned, change: (mc.compute.pruned - mc.compute.original)/(mc.compute.original||1)*100 }
       };
     }
 
@@ -149,8 +150,12 @@ export class BenchmarkResultsComponent implements OnInit {
     this.router.navigateByUrl('/pruning-adjustments');
   }
 
-  exportModel() {
-    // Placeholder: implement actual export call when backend endpoint available
-    console.log('[BenchmarkResults] Export model clicked');
+  exportModel(): void {
+    const uploadId = this.route.snapshot.queryParamMap.get('upload_id');
+    if (uploadId) {
+      this.benchmarkService.exportModel(uploadId);
+    } else {
+      console.error("No upload_id found for export");
+    }
   }
 }

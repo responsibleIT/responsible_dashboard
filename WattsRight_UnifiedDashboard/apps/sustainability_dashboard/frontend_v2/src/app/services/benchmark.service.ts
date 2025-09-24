@@ -18,6 +18,11 @@ export class BenchmarkService {
     return this.http.get<BenchmarkData>(`${this.apiUrl}/benchmark/${upload_id}`);
   }
 
+  public exportModel(uploadId: string): void {
+    const url = `${this.apiUrl}/api/export/${uploadId}`;
+    window.open(url, '_blank'); // triggers browser download
+  }
+
   setUploadId(id: string) { this.currentUploadId = id; }   // 👈 add this
 
   set Data(data: BenchmarkData | null) { this.data$.next(data); }

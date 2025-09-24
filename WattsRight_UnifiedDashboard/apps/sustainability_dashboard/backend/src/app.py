@@ -4,7 +4,7 @@ import time
 import random
 import json
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from werkzeug.utils import secure_filename
@@ -329,6 +329,17 @@ def get_benchmark_data(upload_id):
     }
     return jsonify(resp)
 
+@app.route("/api/export/<upload_id>", methods=["GET"])
+def export_model(upload_id):
+    try:
+        upload_path = os.path.join(UPLOAD_DIR, upload_id)
+        zip_path = os.path.join(upload_path, "pruned_model_hf.zip")
+        if not os.path.exists(zip_path):
+            return {"error": "Pruned model not found"}, 404
+
+        return send_file(zip_path, as_attachment=True, download_name="pruned_model.zip")
+    except Exception as e:
+        return {"error": str(e)}, 500
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
