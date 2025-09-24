@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.building.api import Splash
 from PyInstaller.utils.hooks import collect_all, copy_metadata
+import os
 
 block_cipher = None
 
@@ -77,22 +78,23 @@ a = Analysis(
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 # ---- Splash object ----
-splash = Splash(
-    image_file='splashscreen.png',
+splash = Splash("splashscreen.png",
     binaries=a.binaries,
     datas=a.datas,
-    text_pos=(10, 10),        # optional: position for text updates
-    minify_script=True
+    text_pos=(20, 300),
+    text_size=20,
+    text_color='white'
 )
 
 exe = EXE(
     pyz,
     a.scripts, a.binaries, a.zipfiles, a.datas,
+    splash,
+    splash.binaries,
     name='WattsRightDashboard',
     debug=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=False,                 # keep True while testing
-    splash=[splash],                 # PyInstaller splash
     onefile=True                   # <-- this forces single-file build
 )

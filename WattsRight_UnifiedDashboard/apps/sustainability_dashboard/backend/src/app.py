@@ -344,7 +344,9 @@ def export_model(upload_id):
 
 @app.route("/shutdown", methods=["POST"])
 def shutdown():
-    os.kill(os.getpid(), signal.SIGINT)
+    func = request.environ.get("werkzeug.server.shutdown")
+    if func:
+        func()
     return "Shutting down..."
 
 @app.route('/', defaults={'path': ''})

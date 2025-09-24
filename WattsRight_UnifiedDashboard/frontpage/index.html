@@ -29,16 +29,16 @@
       <div>
         <img src="./public/images/watts-full.svg" alt="no image yet" />
         <ul>
-          <li><a href="#">about</a></li>
-          <li><a href="#">contact</a></li>
+          <li><a href="#" onclick="shutdownServers()">Shut Down Application</a></li>
         </ul>
       </div>
     </footer>
   </body>
 </html>
 <script>
-  window.addEventListener("beforeunload", () => {
+  function shutdownServers() {
     fetch("http://127.0.0.1:5000/shutdown", { method: "POST" }).catch(() => {});
     fetch("http://127.0.0.1:8000/shutdown", { method: "POST" }).catch(() => {});
-  });
+    setTimeout(() => window.close(), 1000); // give servers a sec, then close tab
+  }
 </script>

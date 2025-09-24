@@ -29,15 +29,11 @@ def _get_pyi_splash():
 
 pyi_splash = _get_pyi_splash()
 
-def splash_update(msg: str, color: str = "black", bold: bool = False):
-    """Update splash text with optional color and bold style."""
+def splash_update(msg: str):
+    """Update splash text safely (plain text only)."""
     if pyi_splash:
         try:
-            styled = msg
-            if bold:
-                styled = f"<b>{styled}</b>"
-            styled = f"<span fgcolor='{color}'>{styled}</span>"
-            pyi_splash.update_text(styled)
+            pyi_splash.update_text(msg)
         except Exception:
             pass
 
@@ -59,7 +55,7 @@ def is_port_open(port: int) -> bool:
         return s.connect_ex(("127.0.0.1", port)) == 0
 
 def wait_for_server(port: int, name: str, timeout: int = 30) -> bool:
-    print(f"Waiting for {name} on port {port} (timeout {timeout}s)...", flush=True)
+    # print(f"Waiting for {name} on port {port} (timeout {timeout}s)...", flush=True)
     deadline = time.time() + timeout
     dots = 0
     while time.time() < deadline:
@@ -68,10 +64,10 @@ def wait_for_server(port: int, name: str, timeout: int = 30) -> bool:
             return True
         time.sleep(0.5)
         dots += 1
-        if dots % 4 == 0:
-            print(".", end="", flush=True)
-    print("")  # newline
-    print(f"Timed out waiting for {name} on port {port}.", flush=True)
+    #     if dots % 4 == 0:
+    #         print(".", end="", flush=True)
+    # print("")  # newline
+    # print(f"Timed out waiting for {name} on port {port}.", flush=True)
     return False
 
 def run_child_script_here(script_path: str, cwd: str | None = None) -> None:
@@ -92,7 +88,7 @@ def run_server(role: str, script_path: str, cwd: str | None, log_name: str) -> s
     log_dir = Path(tempfile.gettempdir()) / "wattsright_logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / f"{log_name}.log"
-    print(f"Logging {log_name} to: {log_file}", flush=True)
+    # print(f"Logging {log_name} to: {log_file}", flush=True)
     f = open(log_file, "w", buffering=1, encoding="utf-8", errors="replace")
 
     env = os.environ.copy()
@@ -130,13 +126,14 @@ def parent_main() -> int:
     # ensure uploads dir exists next to exe (or current working dir)
     UPLOADS_DIR = Path("uploads")
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"Uploads directory ready at: {UPLOADS_DIR.resolve()}", flush=True)
+    splash_update("Preparing uploads directory...")
+    # print(f"Uploads directory ready at: {UPLOADS_DIR.resolve()}", flush=True)
 
-    print("Resolved paths:", flush=True)
-    print(f"  Fairness script:        {FAIRNESS_SCRIPT}", flush=True)
-    print(f"  Sustainability script:  {SUSTAINABILITY_SCRIPT}", flush=True)
-    print(f"  Sustainability cwd:     {SUSTAINABILITY_DIR}", flush=True)
-    print(f"  Frontpage:              {FRONTPAGE_HTML}", flush=True)
+    # print("Resolved paths:", flush=True)
+    # print(f"  Fairness script:        {FAIRNESS_SCRIPT}", flush=True)
+    # print(f"  Sustainability script:  {SUSTAINABILITY_SCRIPT}", flush=True)
+    # print(f"  Sustainability cwd:     {SUSTAINABILITY_DIR}", flush=True)
+    # print(f"  Frontpage:              {FRONTPAGE_HTML}", flush=True)
 
     # Sanity checks
     missing = []
@@ -144,15 +141,15 @@ def parent_main() -> int:
     if not Path(SUSTAINABILITY_SCRIPT).is_file():  missing.append(SUSTAINABILITY_SCRIPT)
     if not Path(FRONTPAGE_HTML).is_file():         missing.append(FRONTPAGE_HTML)
     if missing:
-        splash_update("Missing files!", color="red", bold=True)
-        print("Missing required files in the bundle:", flush=True)
+        splash_update("Missing files!")
+        # print("Missing required files in the bundle:", flush=True)
         for m in missing:
-            print("  -", m)
+            # print("  -", m)
+            pass
         return 1
 
     # Start servers
-    splash_update("Launching servers...", color="blue", bold=True)
-    print("Launching servers...", flush=True)
+    splash_update("Launching servers...")
 
     fairness_proc = run_server(
         "FAIRNESS",
@@ -168,23 +165,23 @@ def parent_main() -> int:
     )
 
     # Splash / progress
-    splash_update("Waiting for Fairness dashboard...", color="blue")
+    splash_update("Waiting for Fairness dashboard...")
     ok1 = wait_for_server(5000, "Fairness dashboard", timeout=40)
     if ok1:
-        splash_update("Fairness ready", color="green", bold=True)
+        splash_update("Fairness ready")
     else:
-        splash_update("Fairness failed", color="red", bold=True)
+        splash_update("Fairness failed")
 
-    splash_update("Waiting for Sustainability dashboard...", color="blue")
+    splash_update("Waiting for Sustainability dashboard...")
     ok2 = wait_for_server(8000, "Sustainability dashboard", timeout=40)
     if ok2:
-        splash_update("Sustainability ready", color="green", bold=True)
+        splash_update("Sustainability ready")
     else:
-        splash_update("Sustainability failed", color="red", bold=True)
+        splash_update("Sustainability failed")
 
     if ok1 and ok2:
-        splash_update("Opening frontpage...", color="green", bold=True)
-        print("Opening frontpage...", flush=True)
+        splash_update("Opening frontpage...")
+        # print("Opening frontpage...", flush=True)
         webbrowser.open(f"file:///{FRONTPAGE_HTML}")
         if pyi_splash:
             try:
@@ -192,8 +189,8 @@ def parent_main() -> int:
             except Exception:
                 pass
     else:
-        splash_update("Startup failed. Check logs.", color="red", bold=True)
-        print("One or both servers failed to start. See logs in %TEMP%/wattsright_logs.", flush=True)
+        splash_update("Startup failed. Check logs.")
+        # print("One or both servers failed to start. See logs in %TEMP%/wattsright_logs.", flush=True)
         if pyi_splash:
             try:
                 pyi_splash.close()
@@ -205,7 +202,7 @@ def parent_main() -> int:
         fairness_proc.wait()
         sustainability_proc.wait()
     except KeyboardInterrupt:
-        print("\nKeyboardInterrupt: terminating children...", flush=True)
+        # print("\nKeyboardInterrupt: terminating children...", flush=True)
         try: fairness_proc.terminate()
         except Exception: pass
         try: sustainability_proc.terminate()
@@ -222,14 +219,14 @@ def child_main(role: str) -> int:
         elif role == "SUSTAINABILITY":
             run_child_script_here(SUSTAINABILITY_SCRIPT, cwd=SUSTAINABILITY_DIR)
         else:
-            print(f"Unknown WR_ROLE '{role}'", flush=True)
+            # print(f"Unknown WR_ROLE '{role}'", flush=True)
             return 2
         return 0
     except SystemExit as e:
         return int(e.code) if isinstance(e.code, int) else 0
     except Exception as e:
         # Child exceptions go to the role log file via stdout/err redirection
-        print(f"[Child:{role}] Unhandled error: {e}", flush=True)
+        # print(f"[Child:{role}] Unhandled error: {e}", flush=True)
         import traceback; traceback.print_exc()
         return 3
 
