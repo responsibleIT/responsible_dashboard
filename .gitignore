@@ -1,2 +1,4 @@
-WattsRight_UnifiedDashboard/apps/sustainability_dashboard/frontend_v2/src/app/pages/benchmark-results/components/benchmark-details/benchmark-metric-cards/benchmark-metric-card/benchmark-metric-card.component.html
-WattsRight_UnifiedDashboard/apps/sustainability_dashboard/frontend_v2/src/app/pages/benchmark-results/components/benchmark-details/benchmark-metric-cards/benchmark-metric-card/benchmark-metric-card.component.scss
+WattsRight_UnifiedDashboard/dist/
+WattsRight_UnifiedDashboard/build/
+WattsRight_UnifiedDashboard/*.exe
+WattsRight_UnifiedDashboard/*.pkg

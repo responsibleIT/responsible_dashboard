@@ -288,15 +288,15 @@ def upload_file():
         save_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{unique_id}_dataset_{filename}")
         try:
             clear_uploads_folder()
-            file.save(save_path);
-            try: columns = pd.read_csv(save_path, nrows=0).columns.tolist();
+            file.save(save_path)
+            try: columns = pd.read_csv(save_path, nrows=0).columns.tolist()
             except pd.errors.EmptyDataError: flash('CSV empty.', 'error'); os.remove(save_path); return redirect(url_for('dashboard'))
             except Exception as pd_err: flash(f'Error reading headers: {pd_err}.', 'error'); os.remove(save_path); return redirect(url_for('dashboard'))
 
             session.clear()
             session['uploaded_file_path'] = save_path
             session['columns'] = columns
-            session.modified = True;
+            session.modified = True
             logging.info(f"Dataset '{filename}' uploaded successfully. Path: {save_path}. Columns: {columns}")
             return redirect(url_for('configure'))
         except Exception as e:
