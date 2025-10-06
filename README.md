@@ -22,37 +22,11 @@ classes in the uploaded data. Finally, the pruned model can be exported as a Hug
 
 The dashboards run locally and communicate through Python servers that handle user data, model metrics, and visualization endpoints.
 
----
-
-## 🧩 File Structure
-
-WattsRight_UnifiedDashboard/
-├── apps/
-│ ├── fairness_dashboard/
-│ │ └── flask_ml/
-│ │ ├── static/
-│ │ ├── templates/
-│ │ └── app.py
-│ ├── sustainability_dashboard/
-│ │ ├── backend/
-│ │ ├── frontend_v2/
-│ │ └── model/
-│ └── init.py
-├── frontpage/
-│ └── index.html
-├── splashscreen.png
-├── main.py
-├── main.spec
-├── requirements.txt
-└── README.md
-
 --
 
 ## 🧱 Installation (Development Mode)
 
 If you’re running this from source (instead of the `.exe`):
-
-### 1️⃣ Clone the repository
 
 ```bash
 git clone https://github.com/<your-username>/wattsright-unified-dashboard.git
@@ -106,6 +80,7 @@ Developed in collaboration between University of Applied Sciences Amsterdam, KPN
 - If the .exe doesn’t start: check for antivirus blocking or permission issues.
 - If ports 5000 or 8000 are in use, kill those processes first.
 - The splash screen may display dependency loading messages — this is expected.
+
 
 
 
