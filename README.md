@@ -3,7 +3,7 @@
 The **Watt’s Right Unified Dashboard** is a standalone desktop application that brings together two complementary dashboards — **Fairness** and **Sustainability** — into one cohesive interface.  
 It allows educators, students, researchers and practicioners to **analyze, visualize, and reflect on AI systems** from ethical, fairness, and sustainability perspectives.
 
-This unified dashboard is designed to **run anywhere** without installation requirements — users simply double-click the generated `.exe` file to launch the app, which automatically spins up local Flask/FastAPI servers and opens the dashboard in the browser.
+This unified dashboard is designed to **run anywhere** without installation requirements — users simply double-click the generated `.exe` file to launch the app, which automatically spins up local Flask servers and opens the dashboard in the browser.
 
 ---
 
@@ -80,6 +80,7 @@ Developed in collaboration between University of Applied Sciences Amsterdam, KPN
 - If the .exe doesn’t start: check for antivirus blocking or permission issues.
 - If ports 5000 or 8000 are in use, kill those processes first.
 - The splash screen may display dependency loading messages — this is expected.
+
 
 
 
