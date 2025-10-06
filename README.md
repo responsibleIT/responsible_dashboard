@@ -5,6 +5,8 @@ It allows educators, students, researchers and practicioners to **analyze, visua
 
 This unified dashboard is designed to **run anywhere** without installation requirements — users simply double-click the generated `.exe` file to launch the app, which automatically spins up local Flask servers and opens the dashboard in the browser.
 
+Currently the dashboard only functions on **Windows** systems
+
 ---
 
 ## 🌍 Overview
@@ -80,6 +82,7 @@ Developed in collaboration between University of Applied Sciences Amsterdam, KPN
 - If the .exe doesn’t start: check for antivirus blocking or permission issues.
 - If ports 5000 or 8000 are in use, kill those processes first.
 - The splash screen may display dependency loading messages — this is expected.
+
 
 
 
