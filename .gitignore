@@ -7,17 +7,6 @@ __pycache__/
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
 
-# Distribution / packaging
-build/
-dist/
-*.egg-info/
-*.egg
-*.manifest
-*.spec
-*.exe
-*.dll
-*.pyd
-
 # Virtual environments
 .venv/
 venv/
