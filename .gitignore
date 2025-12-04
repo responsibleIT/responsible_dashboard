@@ -1,47 +1,28 @@
-# Python backend
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
+*.pyo
+*.pyd
 
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints/
-
-# Virtual environments
-.venv/
+# Virtualenvs
 venv/
-ENV/
-env/
+.env/
 
-# Node modules
+# PyInstaller / build artifacts
+WattsRight_UnifiedDashboard/dist/
+WattsRight_UnifiedDashboard/build/
+*.spec
+*.exe
+*.pkg
+*.pyz
+*.toc
+
+# Node / frontends
 node_modules/
+WattsRight_UnifiedDashboard/**/node_modules/
+WattsRight_UnifiedDashboard/**/dist/
+WattsRight_UnifiedDashboard/**/build/
 
-# Angular build output
-apps/sustainability_dashboard/frontend_v2/dist/
-apps/sustainability_dashboard/frontend_v2/.angular/
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Uploads / runtime data
-uploads/
-wattsright_logs/
-
-# Local configs
-.env
-*.env
-
-# VSCode
-.vscode/
-*.code-workspace
-
-# JetBrains
-.idea/
-
-# macOS / Windows
+# OS
 .DS_Store
 Thumbs.db
-
