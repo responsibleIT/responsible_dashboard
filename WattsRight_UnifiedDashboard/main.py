@@ -122,12 +122,136 @@ SUSTAINABILITY_DIR = resource_path("apps/sustainability_dashboard/backend/src")
 SUSTAINABILITY_SCRIPT = str(Path(SUSTAINABILITY_DIR) / "app.py")
 FRONTPAGE_HTML = resource_path("frontpage/index.html")
 
-def parent_main() -> int:
+# -------- Frontend Build Helpers --------
+SUSTAINABILITY_FRONTEND_DIR = resource_path("apps/sustainability_dashboard/frontend_v2")
+SUSTAINABILITY_DIST_DIR = str(Path(SUSTAINABILITY_FRONTEND_DIR) / "dist" / "browser")
+
+def check_npm_available() -> bool:
+    """Check if npm is available in the system PATH."""
+    try:
+        result = subprocess.run(
+            ["npm", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            shell=True  # Required for Windows to find npm
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+def build_sustainability_frontend() -> bool:
+    """
+    Build the Angular frontend for the sustainability dashboard.
+    Returns True if build succeeds or already exists, False otherwise.
+    """
+    frontend_dir = Path(SUSTAINABILITY_FRONTEND_DIR)
+    dist_index = Path(SUSTAINABILITY_DIST_DIR) / "index.html"
+    node_modules = frontend_dir / "node_modules"
+    
+    # Check if build already exists
+    if dist_index.is_file():
+        print("Sustainability frontend already built.", flush=True)
+        return True
+    
+    print("Sustainability frontend not built. Starting build process...", flush=True)
+    
+    # Check npm availability
+    if not check_npm_available():
+        print("ERROR: npm is not installed or not in PATH.", flush=True)
+        print("Please install Node.js from https://nodejs.org/", flush=True)
+        return False
+    
+    # Install dependencies if node_modules doesn't exist
+    if not node_modules.is_dir():
+        print("Installing npm dependencies (this may take a few minutes)...", flush=True)
+        splash_update("Installing npm dependencies...")
+        try:
+            result = subprocess.run(
+                ["npm", "install"],
+                cwd=str(frontend_dir),
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minute timeout for npm install
+                shell=True
+            )
+            if result.returncode != 0:
+                print(f"npm install failed:\n{result.stderr}", flush=True)
+                return False
+            print("npm dependencies installed.", flush=True)
+        except subprocess.TimeoutExpired:
+            print("npm install timed out.", flush=True)
+            return False
+        except Exception as e:
+            print(f"npm install error: {e}", flush=True)
+            return False
+    
+    # Build the Angular app
+    print("Building Angular frontend (this may take a minute)...", flush=True)
+    splash_update("Building sustainability frontend...")
+    try:
+        result = subprocess.run(
+            ["npm", "run", "build"],
+            cwd=str(frontend_dir),
+            capture_output=True,
+            text=True,
+            timeout=300,  # 5 minute timeout for build
+            shell=True
+        )
+        if result.returncode != 0:
+            print(f"npm build failed:\n{result.stderr}", flush=True)
+            return False
+        print("Angular frontend built successfully.", flush=True)
+        return True
+    except subprocess.TimeoutExpired:
+        print("npm build timed out.", flush=True)
+        return False
+    except Exception as e:
+        print(f"npm build error: {e}", flush=True)
+        return False
+
+def ensure_frontends_built() -> bool:
+    """
+    Ensure all frontend builds are complete before starting servers.
+    Only runs when executing from source (not frozen exe).
+    Returns True if all builds succeed, False otherwise.
+    """
+    # Skip build step when running as frozen exe - builds should be pre-bundled
+    if getattr(sys, "frozen", False):
+        return True
+    
+    print("=" * 50, flush=True)
+    print("Checking frontend builds...", flush=True)
+    print("=" * 50, flush=True)
+    
+    # Sustainability dashboard requires Angular build
+    if not build_sustainability_frontend():
+        print("Failed to build sustainability frontend.", flush=True)
+        return False
+    
+    # Fairness dashboard uses static files (no build needed)
+    print("Fairness dashboard uses static files (no build needed).", flush=True)
+    
+    print("=" * 50, flush=True)
+    print("All frontend builds complete.", flush=True)
+    print("=" * 50, flush=True)
+    return True
+
+def parent_main(skip_build: bool = False) -> int:
     # ensure uploads dir exists next to exe (or current working dir)
     UPLOADS_DIR = Path("uploads")
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     splash_update("Preparing uploads directory...")
     # print(f"Uploads directory ready at: {UPLOADS_DIR.resolve()}", flush=True)
+
+    # Build frontends if needed (only when running from source)
+    if not skip_build:
+        splash_update("Checking frontend builds...")
+        if not ensure_frontends_built():
+            splash_update("Frontend build failed!")
+            print("ERROR: Frontend build failed. Cannot start application.", flush=True)
+            print("Make sure Node.js/npm is installed and try again.", flush=True)
+            return 1
 
     # print("Resolved paths:", flush=True)
     # print(f"  Fairness script:        {FAIRNESS_SCRIPT}", flush=True)
@@ -230,6 +354,25 @@ def child_main(role: str) -> int:
         import traceback; traceback.print_exc()
         return 3
 
+def print_usage():
+    """Print usage information."""
+    print("""
+WattsRight Unified Dashboard
+
+Usage: python main.py [options]
+
+Options:
+  --build-only     Build frontend assets only, don't start servers
+  --rebuild        Force rebuild of frontend assets even if they exist
+  --skip-build     Skip frontend build check (use existing builds)
+  --help, -h       Show this help message
+
+When running without options, the script will:
+  1. Check if frontend builds exist (and build if needed)
+  2. Start the Fairness and Sustainability dashboard servers
+  3. Open the frontpage in your default browser
+""", flush=True)
+
 if __name__ == "__main__":
     multiprocessing.freeze_support()  # important for PyInstaller on Windows
 
@@ -238,5 +381,40 @@ if __name__ == "__main__":
         # Child branch: run the dashboard script and exit.
         sys.exit(child_main(role))
     else:
+        # Parse command line arguments
+        args = sys.argv[1:]
+        
+        if "--help" in args or "-h" in args:
+            print_usage()
+            sys.exit(0)
+        
+        if "--build-only" in args:
+            # Just build frontends and exit
+            print("Build-only mode: building frontends...", flush=True)
+            if ensure_frontends_built():
+                print("Build complete!", flush=True)
+                sys.exit(0)
+            else:
+                print("Build failed!", flush=True)
+                sys.exit(1)
+        
+        skip_build = False
+        
+        if "--rebuild" in args:
+            # Force rebuild by removing dist directory
+            dist_dir = Path(SUSTAINABILITY_DIST_DIR)
+            if dist_dir.exists():
+                import shutil
+                print(f"Removing existing build: {dist_dir}", flush=True)
+                shutil.rmtree(dist_dir, ignore_errors=True)
+        
+        if "--skip-build" in args:
+            # Skip build check - user takes responsibility
+            skip_build = True
+            print("Skipping frontend build check.", flush=True)
+            # Check if dist exists anyway and warn
+            if not Path(SUSTAINABILITY_DIST_DIR).exists():
+                print("WARNING: Sustainability frontend not built. Dashboard may not work correctly.", flush=True)
+        
         # Parent branch: spawn children, wait on ports, open frontpage.
-        sys.exit(parent_main())
+        sys.exit(parent_main(skip_build=skip_build))
