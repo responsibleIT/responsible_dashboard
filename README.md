@@ -53,6 +53,13 @@ pip install -r requirements.txt
 python main.py
 ```
 
+**macOS Apple Silicon (M1/M2/M3) Note:**
+If you have an Apple Silicon Mac, you need to install the macOS-specific TensorFlow after the regular requirements:
+```bash
+pip uninstall tensorflow
+pip install tensorflow-macos>=2.12.0,<2.16.0
+```
+
 When you run `main.py` for the first time, it will automatically:
 1. Check if npm is available
 2. Install Angular dependencies (`npm install`) if needed
