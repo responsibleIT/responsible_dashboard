@@ -3,26 +3,56 @@ __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+.eggs/
 
 # Virtualenvs
 venv/
 .env/
+.venv/
+env/
 
 # PyInstaller / build artifacts
 WattsRight_UnifiedDashboard/dist/
 WattsRight_UnifiedDashboard/build/
-*.spec
 *.exe
 *.pkg
 *.pyz
 *.toc
+*.spec.bak
+*.app/
 
 # Node / frontends
 node_modules/
 WattsRight_UnifiedDashboard/**/node_modules/
 WattsRight_UnifiedDashboard/**/dist/
 WattsRight_UnifiedDashboard/**/build/
+.angular/
+.npm/
+npm-debug.log*
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
+logs/
+wattsright_logs/
+
+# Uploads (user data)
+WattsRight_UnifiedDashboard/uploads/*
+!WattsRight_UnifiedDashboard/uploads/.gitkeep
+WattsRight_UnifiedDashboard/**/uploads/*
+!WattsRight_UnifiedDashboard/**/uploads/.gitkeep

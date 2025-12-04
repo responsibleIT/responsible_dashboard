@@ -3,9 +3,9 @@
 The **Watt's Right Unified Dashboard** is a standalone desktop application that brings together two complementary dashboards — **Fairness** and **Sustainability** — into one cohesive interface.  
 It allows educators, students, researchers, and practitioners to **analyze, visualize, and reflect on AI systems** from ethical, fairness, and sustainability perspectives.
 
-This unified dashboard is designed to **run anywhere** without installation requirements — users simply double-click the generated `.exe` file to launch the app, which automatically spins up local Flask servers and opens the dashboard in the browser.
+This unified dashboard is designed to **run anywhere** without installation requirements — users simply double-click the generated executable (`.exe` on Windows, `.app` on macOS) to launch the app, which automatically spins up local Flask servers and opens the dashboard in the browser.
 
-Currently the dashboard only functions on **Windows** systems.
+The dashboard runs on **Windows** and **macOS** systems.
 
 ---
 
@@ -33,11 +33,22 @@ If you're running this from source (instead of the `.exe`):
 
 ### Setup
 
+**Windows:**
+```bash
+git clone https://github.com/responsibleIT/responsible_dashboard.git
+cd responsible_dashboard\WattsRight_UnifiedDashboard
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+python main.py
+```
+
+**macOS / Linux:**
 ```bash
 git clone https://github.com/responsibleIT/responsible_dashboard.git
 cd responsible_dashboard/WattsRight_UnifiedDashboard
-python -m venv venv
-venv\Scripts\activate  # On Windows
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 python main.py
 ```
@@ -67,7 +78,7 @@ Options:
 
 ## 🧰 Building the Standalone Executable
 
-To create a single-file `.exe` so anyone can run the dashboard without installing Python or Node.js:
+To create a standalone app so anyone can run the dashboard without installing Python or Node.js:
 
 ### Prerequisites for Building
 1. Complete the development setup above (including running `main.py` at least once to build the Angular frontend)
@@ -78,22 +89,37 @@ To create a single-file `.exe` so anyone can run the dashboard without installin
 
 ### Build Steps
 
+**Windows:**
 ```bash
 cd WattsRight_UnifiedDashboard
 pyinstaller main.spec
 ```
+This generates `dist/WattsRightDashboard.exe`.
 
-This generates a single executable at `dist/WattsRightDashboard.exe`.
+**macOS:**
+```bash
+cd WattsRight_UnifiedDashboard
+pyinstaller main_macos.spec
+```
+This generates `dist/WattsRightDashboard.app`.
 
-You can distribute this file directly to others — they don't need Python, Node.js, or any dependencies installed. When launched, it will extract and run everything in a temporary directory, then clean up after closing.
+You can distribute these files directly to others — they don't need Python, Node.js, or any dependencies installed. When launched, the app will start the servers and open the dashboard in their browser.
 
 ---
 
 ## 🚀 Running the Dashboard (End Users)
 
+**Windows:**
 1. Double-click `WattsRightDashboard.exe`
 2. Wait for the splash screen (Watt's Right logo) to disappear
 3. Your browser will open the Front Page
+
+**macOS:**
+1. Double-click `WattsRightDashboard.app`
+2. If you see a security warning, right-click the app and select "Open", then click "Open" in the dialog
+3. Your browser will open the Front Page
+
+**Both platforms:**
 4. Choose either:
     - **Fairness Dashboard** (localhost:5000)
     - **Sustainability Dashboard** (localhost:8000)
@@ -130,13 +156,18 @@ Developed in collaboration between University of Applied Sciences Amsterdam, KPN
 
 ## 🛠️ Troubleshooting
 
-### Executable Issues
+### Executable Issues (Windows)
 - **Exe doesn't start:** Check for antivirus blocking or permission issues. Try right-clicking and "Run as administrator".
 - **Splash screen hangs:** The app may be loading large dependencies. Wait up to 60 seconds on first launch.
+
+### Executable Issues (macOS)
+- **"App is damaged" or "unidentified developer":** Right-click the app, select "Open", then click "Open" in the dialog. Or go to System Preferences > Security & Privacy and click "Open Anyway".
+- **App won't open:** Try running from Terminal: `open /path/to/WattsRightDashboard.app`
 
 ### Port Issues
 - **Ports 5000 or 8000 in use:** Kill those processes first, or check for other Flask/Node apps running.
 - **Windows Firewall prompt:** Allow access when prompted to enable local server communication.
+- **macOS firewall:** Allow incoming connections when prompted.
 
 ### Development Mode Issues
 - **npm not found:** Install Node.js from https://nodejs.org/ and restart your terminal.
@@ -144,7 +175,10 @@ Developed in collaboration between University of Applied Sciences Amsterdam, KPN
 - **Python dependencies missing:** Ensure you've activated the virtual environment and run `pip install -r requirements.txt`.
 
 ### Logs
-Server logs are written to `%TEMP%/wattsright_logs/` (Windows). Check `fairness.log` and `sustainability.log` for detailed error messages.
+- **Windows:** `%TEMP%/wattsright_logs/`
+- **macOS:** `/tmp/wattsright_logs/`
+
+Check `fairness.log` and `sustainability.log` for detailed error messages.
 
 
 

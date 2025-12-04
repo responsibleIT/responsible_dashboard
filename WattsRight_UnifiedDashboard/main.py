@@ -7,7 +7,13 @@ import subprocess
 import tempfile
 import select          # ensure PyInstaller bundles the C-extension
 import multiprocessing
+import platform
 from pathlib import Path
+
+# Platform detection
+IS_WINDOWS = platform.system() == "Windows"
+IS_MACOS = platform.system() == "Darwin"
+IS_LINUX = platform.system() == "Linux"
 
 # --- make console tolerant to unicode when running as .exe ---
 try:
@@ -92,29 +98,27 @@ def run_server(role: str, script_path: str, cwd: str | None, log_name: str) -> s
     f = open(log_file, "w", buffering=1, encoding="utf-8", errors="replace")
 
     env = os.environ.copy()
+    
+    # Platform-specific process creation flags
+    popen_kwargs = {
+        "cwd": cwd,
+        "stdout": f,
+        "stderr": subprocess.STDOUT,
+        "env": env,
+    }
+    # creationflags is Windows-only
+    if IS_WINDOWS:
+        popen_kwargs["creationflags"] = 0
+    
     if getattr(sys, "frozen", False):
-        # Relaunch the same exe; child branch will pick WR_ROLE and run script.
+        # Relaunch the same exe/app; child branch will pick WR_ROLE and run script.
         env["WR_ROLE"] = role
         cmd = [sys.executable]
-        return subprocess.Popen(
-            cmd,
-            cwd=cwd,
-            stdout=f,
-            stderr=subprocess.STDOUT,
-            env=env,
-            creationflags=0,
-        )
+        return subprocess.Popen(cmd, **popen_kwargs)
     else:
         # Running from source -> just spawn python script normally
         cmd = [sys.executable, script_path]
-        return subprocess.Popen(
-            cmd,
-            cwd=cwd,
-            stdout=f,
-            stderr=subprocess.STDOUT,
-            env=env,
-            creationflags=0,
-        )
+        return subprocess.Popen(cmd, **popen_kwargs)
 
 # -------- Resolve paths inside/beside the bundle --------
 FAIRNESS_SCRIPT = resource_path("apps/fairness_dashboard/flask_ml/app.py")
@@ -129,12 +133,14 @@ SUSTAINABILITY_DIST_DIR = str(Path(SUSTAINABILITY_FRONTEND_DIR) / "dist" / "brow
 def check_npm_available() -> bool:
     """Check if npm is available in the system PATH."""
     try:
+        # On Windows, npm is a batch script so we need shell=True
+        # On macOS/Linux, we can run npm directly
         result = subprocess.run(
             ["npm", "--version"],
             capture_output=True,
             text=True,
             timeout=10,
-            shell=True  # Required for Windows to find npm
+            shell=IS_WINDOWS
         )
         return result.returncode == 0
     except Exception:
@@ -173,7 +179,7 @@ def build_sustainability_frontend() -> bool:
                 capture_output=True,
                 text=True,
                 timeout=300,  # 5 minute timeout for npm install
-                shell=True
+                shell=IS_WINDOWS  # Only use shell=True on Windows
             )
             if result.returncode != 0:
                 print(f"npm install failed:\n{result.stderr}", flush=True)
@@ -196,7 +202,7 @@ def build_sustainability_frontend() -> bool:
             capture_output=True,
             text=True,
             timeout=300,  # 5 minute timeout for build
-            shell=True
+            shell=IS_WINDOWS  # Only use shell=True on Windows
         )
         if result.returncode != 0:
             print(f"npm build failed:\n{result.stderr}", flush=True)
