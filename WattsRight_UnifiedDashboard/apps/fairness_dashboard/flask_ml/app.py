@@ -1282,5 +1282,10 @@ def clear_uploads_folder():
 
 # --- Main execution ---
 if __name__ == '__main__':
+    print("=" * 50, flush=True)
+    print("Fairness Dashboard starting...", flush=True)
+    print(f"Static folder: {app.static_folder}", flush=True)
+    print(f"Template folder: {app.template_folder}", flush=True)
+    print("=" * 50, flush=True)
     logging.info("Starting Flask application server...")
     app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)

@@ -61,19 +61,15 @@ def is_port_open(port: int) -> bool:
         return s.connect_ex(("127.0.0.1", port)) == 0
 
 def wait_for_server(port: int, name: str, timeout: int = 30) -> bool:
-    # print(f"Waiting for {name} on port {port} (timeout {timeout}s)...", flush=True)
+    print(f"Waiting for {name} on port {port}...", flush=True)
     deadline = time.time() + timeout
-    dots = 0
     while time.time() < deadline:
         if is_port_open(port):
             print(f"{name} is up on port {port}.", flush=True)
             return True
         time.sleep(0.5)
-        dots += 1
-    #     if dots % 4 == 0:
-    #         print(".", end="", flush=True)
-    # print("")  # newline
-    # print(f"Timed out waiting for {name} on port {port}.", flush=True)
+    print(f"ERROR: Timed out waiting for {name} on port {port}.", flush=True)
+    print(f"Check logs in: {Path(tempfile.gettempdir()) / 'wattsright_logs'}", flush=True)
     return False
 
 def run_child_script_here(script_path: str, cwd: str | None = None) -> None:
@@ -244,11 +240,18 @@ def ensure_frontends_built() -> bool:
     return True
 
 def parent_main(skip_build: bool = False) -> int:
+    print("", flush=True)
+    print("=" * 50, flush=True)
+    print("WattsRight Unified Dashboard", flush=True)
+    print("=" * 50, flush=True)
+    print(f"Platform: {platform.system()} ({platform.machine()})", flush=True)
+    print(f"Python: {sys.version}", flush=True)
+    print("", flush=True)
+    
     # ensure uploads dir exists next to exe (or current working dir)
     UPLOADS_DIR = Path("uploads")
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     splash_update("Preparing uploads directory...")
-    # print(f"Uploads directory ready at: {UPLOADS_DIR.resolve()}", flush=True)
 
     # Build frontends if needed (only when running from source)
     if not skip_build:
@@ -258,12 +261,24 @@ def parent_main(skip_build: bool = False) -> int:
             print("ERROR: Frontend build failed. Cannot start application.", flush=True)
             print("Make sure Node.js/npm is installed and try again.", flush=True)
             return 1
+    
+    # Verify the sustainability frontend exists
+    sustainability_index = Path(SUSTAINABILITY_DIST_DIR) / "index.html"
+    if not sustainability_index.is_file():
+        print(f"ERROR: Sustainability frontend not found at: {sustainability_index}", flush=True)
+        print("The Angular build may have failed. Try running:", flush=True)
+        print(f"  cd {SUSTAINABILITY_FRONTEND_DIR}", flush=True)
+        print("  npm install", flush=True)
+        print("  npm run build", flush=True)
+        return 1
+    else:
+        print(f"Sustainability frontend found: {sustainability_index}", flush=True)
 
-    # print("Resolved paths:", flush=True)
-    # print(f"  Fairness script:        {FAIRNESS_SCRIPT}", flush=True)
-    # print(f"  Sustainability script:  {SUSTAINABILITY_SCRIPT}", flush=True)
-    # print(f"  Sustainability cwd:     {SUSTAINABILITY_DIR}", flush=True)
-    # print(f"  Frontpage:              {FRONTPAGE_HTML}", flush=True)
+    print(f"Resolved paths:", flush=True)
+    print(f"  Fairness script:        {FAIRNESS_SCRIPT}", flush=True)
+    print(f"  Sustainability script:  {SUSTAINABILITY_SCRIPT}", flush=True)
+    print(f"  Sustainability cwd:     {SUSTAINABILITY_DIR}", flush=True)
+    print(f"  Frontpage:              {FRONTPAGE_HTML}", flush=True)
 
     # Sanity checks
     missing = []
@@ -272,14 +287,15 @@ def parent_main(skip_build: bool = False) -> int:
     if not Path(FRONTPAGE_HTML).is_file():         missing.append(FRONTPAGE_HTML)
     if missing:
         splash_update("Missing files!")
-        # print("Missing required files in the bundle:", flush=True)
+        print("ERROR: Missing required files:", flush=True)
         for m in missing:
-            # print("  -", m)
-            pass
+            print(f"  - {m}", flush=True)
         return 1
 
     # Start servers
     splash_update("Launching servers...")
+    log_dir = Path(tempfile.gettempdir()) / "wattsright_logs"
+    print(f"Server logs will be written to: {log_dir}", flush=True)
 
     fairness_proc = run_server(
         "FAIRNESS",
@@ -296,47 +312,85 @@ def parent_main(skip_build: bool = False) -> int:
 
     # Splash / progress
     splash_update("Waiting for Fairness dashboard...")
-    ok1 = wait_for_server(5000, "Fairness dashboard", timeout=40)
+    ok1 = wait_for_server(5000, "Fairness dashboard", timeout=60)
     if ok1:
         splash_update("Fairness ready")
     else:
         splash_update("Fairness failed")
 
     splash_update("Waiting for Sustainability dashboard...")
-    ok2 = wait_for_server(8000, "Sustainability dashboard", timeout=40)
+    ok2 = wait_for_server(8000, "Sustainability dashboard", timeout=60)
     if ok2:
         splash_update("Sustainability ready")
     else:
         splash_update("Sustainability failed")
 
+    if pyi_splash:
+        try:
+            pyi_splash.close()
+        except Exception:
+            pass
+
     if ok1 and ok2:
         splash_update("Opening frontpage...")
-        # print("Opening frontpage...", flush=True)
-        webbrowser.open(f"file:///{FRONTPAGE_HTML}")
-        if pyi_splash:
-            try:
-                pyi_splash.close()
-            except Exception:
-                pass
+        print("Opening frontpage...", flush=True)
+        # Cross-platform file URL
+        frontpage_path = Path(FRONTPAGE_HTML).resolve()
+        if IS_WINDOWS:
+            # Windows: file:///C:/path/to/file.html
+            frontpage_url = frontpage_path.as_uri()
+        else:
+            # macOS/Linux: file:///path/to/file.html
+            frontpage_url = frontpage_path.as_uri()
+        webbrowser.open(frontpage_url)
+        print(f"Frontpage opened: {frontpage_url}", flush=True)
     else:
-        splash_update("Startup failed. Check logs.")
-        # print("One or both servers failed to start. See logs in %TEMP%/wattsright_logs.", flush=True)
-        if pyi_splash:
-            try:
-                pyi_splash.close()
-            except Exception:
-                pass
+        log_dir = Path(tempfile.gettempdir()) / "wattsright_logs"
+        print("\n" + "=" * 50, flush=True)
+        print("ERROR: One or both servers failed to start.", flush=True)
+        print(f"Check logs in: {log_dir}", flush=True)
+        print("=" * 50, flush=True)
+        # Still keep running if at least one server is up
+        if not ok1 and not ok2:
+            print("Both servers failed. Exiting.", flush=True)
+            try: fairness_proc.terminate()
+            except Exception: pass
+            try: sustainability_proc.terminate()
+            except Exception: pass
+            return 1
 
     # Keep parent alive; clean exit on Ctrl+C
+    print("\nServers are running. Press Ctrl+C to stop.", flush=True)
+    print(f"  - Fairness Dashboard:       http://localhost:5000", flush=True)
+    print(f"  - Sustainability Dashboard: http://localhost:8000", flush=True)
+    print("", flush=True)
+    
     try:
-        fairness_proc.wait()
-        sustainability_proc.wait()
+        # Wait for either process to exit
+        while True:
+            # Check if processes are still running
+            f_poll = fairness_proc.poll()
+            s_poll = sustainability_proc.poll()
+            
+            if f_poll is not None and s_poll is not None:
+                # Both processes have exited
+                print("Both servers have stopped.", flush=True)
+                break
+            
+            time.sleep(1)
     except KeyboardInterrupt:
-        # print("\nKeyboardInterrupt: terminating children...", flush=True)
+        print("\nShutting down servers...", flush=True)
         try: fairness_proc.terminate()
         except Exception: pass
         try: sustainability_proc.terminate()
         except Exception: pass
+        # Give them a moment to clean up
+        time.sleep(1)
+        try: fairness_proc.kill()
+        except Exception: pass
+        try: sustainability_proc.kill()
+        except Exception: pass
+        print("Servers stopped.", flush=True)
     return 0
 
 def child_main(role: str) -> int:

@@ -46,11 +46,20 @@ def _bundle_path(rel: str) -> str:
 STATIC_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "frontend_v2", "dist", "browser")
 )
+
+# Debug: print paths being checked
+print(f"[Sustainability] Checking STATIC_DIR: {STATIC_DIR}", flush=True)
+print(f"[Sustainability] index.html exists: {os.path.exists(os.path.join(STATIC_DIR, 'index.html'))}", flush=True)
+
 # If packaged by PyInstaller, also try resolving via _MEIPASS
 if not os.path.exists(os.path.join(STATIC_DIR, "index.html")):
     alt = _bundle_path(os.path.join("apps", "sustainability_dashboard", "frontend_v2", "dist", "browser"))
+    print(f"[Sustainability] Trying alternate path: {alt}", flush=True)
+    print(f"[Sustainability] alt index.html exists: {os.path.exists(os.path.join(alt, 'index.html'))}", flush=True)
     if os.path.exists(os.path.join(alt, "index.html")):
         STATIC_DIR = alt
+
+print(f"[Sustainability] Final STATIC_DIR: {STATIC_DIR}", flush=True)
 
 # ---- Flask / Socket.IO setup ----
 app = Flask(__name__, static_folder=STATIC_DIR, static_url_path="")
