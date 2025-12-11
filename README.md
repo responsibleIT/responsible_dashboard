@@ -7,6 +7,13 @@ This unified dashboard is designed to **run anywhere** without installation requ
 
 The dashboard runs on **Windows** and **macOS** systems.
 
+The **Fairness** dashboard takes any dataset in .csv format.
+
+For the **Sustainability** dashboard:
+  - A huggingface model link should refer to a Large Language Model meant for a classification task, for example: sureshs/distilbert-large-sms-spam (used in demo's of this dashboard)
+  - The dataset should be a text dataset with one column containing (one-hot encoded) classes. This repo contains an example dataset called sustainability_demo_dataset.csv
+  - Be sure to enter the name of the column in the data that contains the target feature. With the example dataset, this is 'label'
+
 ---
 
 ## 🌍 Overview
@@ -186,6 +193,7 @@ Developed in collaboration between University of Applied Sciences Amsterdam, KPN
 - **macOS:** `/tmp/wattsright_logs/`
 
 Check `fairness.log` and `sustainability.log` for detailed error messages.
+
 
 
 
