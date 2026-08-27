@@ -1,9 +1,5 @@
 import {Component, EventEmitter, Input, Output} from '@angular/core';
 import {ButtonDirective} from "@app/domains/ui/directives/button/button.directive";
-import {FormInputSliderComponent} from "@app/domains/ui/components/forms/form-input-slider/form-input-slider.component";
-import {
-    PruningSettingsComponent
-} from "@app/pages/pruning-adjustments/components/pruning-menu-left/pruning-settings/pruning-settings.component";
 import {DecimalPipe, TitleCasePipe, UpperCasePipe} from "@angular/common";
 import {BenchmarkData} from '@app/types/pruning.types';
 
@@ -11,8 +7,6 @@ import {BenchmarkData} from '@app/types/pruning.types';
   selector: 'app-benchmark-menu-left',
   imports: [
     ButtonDirective,
-    FormInputSliderComponent,
-    PruningSettingsComponent,
     UpperCasePipe,
     DecimalPipe,
     TitleCasePipe

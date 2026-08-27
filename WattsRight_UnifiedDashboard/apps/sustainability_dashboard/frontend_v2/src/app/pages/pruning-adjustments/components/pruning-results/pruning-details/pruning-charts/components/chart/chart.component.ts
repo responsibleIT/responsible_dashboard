@@ -26,6 +26,15 @@ export class ChartComponent implements OnInit, OnChanges, AfterViewInit, OnDestr
   @Input() lineColor: string = '#4682b4'; // Default to steelblue
   @Input() titleColor: string = '#000000'; // Default to black
 
+  // Optional: uncertainty band (upper/lower bound values keyed by same x as data)
+  @Input() uncertaintyUpper: Record<number, number> | null = null;
+  @Input() uncertaintyLower: Record<number, number> | null = null;
+
+  // Optional: vertical marker line at a specific x value (e.g. knee threshold)
+  @Input() markerX: number | null = null;
+  @Input() markerLabel: string = '';
+  @Input() markerColor: string = '#FF6B35';
+
   private margin = { top: 40, right: 30, bottom: 60, left: 80 };
   private tooltip: any;
   private subscription = new Subscription();
@@ -122,7 +131,18 @@ export class ChartComponent implements OnInit, OnChanges, AfterViewInit, OnDestr
 
     // Set up scales
     const xExtent = d3.extent(dataArray, d => d.x) as [number, number];
-    const yExtent = d3.extent(dataArray, d => d.y) as [number, number];
+    let yMin = d3.min(dataArray, d => d.y) as number;
+    let yMax = d3.max(dataArray, d => d.y) as number;
+
+    // Expand y domain to include uncertainty band if present
+    if (this.uncertaintyUpper) {
+      const upperVals = Object.values(this.uncertaintyUpper).map(Number);
+      yMax = Math.max(yMax, ...upperVals);
+    }
+    if (this.uncertaintyLower) {
+      const lowerVals = Object.values(this.uncertaintyLower).map(Number);
+      yMin = Math.min(yMin, ...lowerVals);
+    }
 
     const x = d3.scaleLinear()
       .range([0, contentWidth])
@@ -130,7 +150,7 @@ export class ChartComponent implements OnInit, OnChanges, AfterViewInit, OnDestr
 
     const y = d3.scaleLinear()
       .range([contentHeight, 0])
-      .domain([yExtent[0], yExtent[1] * 1.1]); // Add 10% padding at top
+      .domain([yMin, yMax * 1.1]); // Add 10% padding at top
 
     const g = svg.append('g')
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
@@ -206,6 +226,65 @@ export class ChartComponent implements OnInit, OnChanges, AfterViewInit, OnDestr
       .attr('stroke', this.lineColor) // CHANGED: Use lineColor input
       .attr('stroke-width', 2)
       .attr('d', line);
+
+    // Uncertainty band (shaded area between lower and uppe like GP ±1σ)
+    if (this.uncertaintyUpper && this.uncertaintyLower) {
+      const bandData = dataArray.map(d => ({
+        x: d.x,
+        upper: this.uncertaintyUpper![d.x] ?? d.y,
+        lower: this.uncertaintyLower![d.x] ?? d.y,
+      }));
+
+      const area = d3.area<{ x: number; upper: number; lower: number }>()
+        .x(d => x(d.x))
+        .y0(d => y(d.lower))
+        .y1(d => y(d.upper))
+        .curve(d3.curveMonotoneX);
+
+      // Insert behind the main line
+      g.insert('path', ':first-child')
+        .datum(bandData)
+        .attr('fill', this.lineColor)
+        .attr('opacity', 0.15)
+        .attr('stroke', 'none')
+        .attr('d', area);
+    }
+
+    // Knee / recommended threshold marker (vertical line + label)
+    if (this.markerX !== null) {
+      const mx = x(this.markerX);
+      g.append('line')
+        .attr('x1', mx).attr('y1', 0)
+        .attr('x2', mx).attr('y2', contentHeight)
+        .attr('stroke', this.markerColor)
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '6,4');
+
+      if (this.markerLabel) {
+        g.append('text')
+          .attr('x', mx + 6)
+          .attr('y', 14)
+          .attr('font-size', '10px')
+          .attr('font-weight', '600')
+          .attr('fill', this.markerColor)
+          .text(this.markerLabel);
+      }
+
+      // Star marker at the intersection with the data line
+      const closest = dataArray.reduce((prev, curr) =>
+        Math.abs(curr.x - this.markerX!) < Math.abs(prev.x - this.markerX!) ? curr : prev
+      );
+      g.append('text')
+        .attr('x', x(closest.x))
+        .attr('y', y(closest.y))
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'central')
+        .attr('font-size', '18px')
+        .attr('fill', this.markerColor)
+        .attr('stroke', 'white')
+        .attr('stroke-width', 0.5)
+        .text('★');
+    }
 
     // REMOVED: The section for adding data points as circles has been removed.
     // g.selectAll('.dot')

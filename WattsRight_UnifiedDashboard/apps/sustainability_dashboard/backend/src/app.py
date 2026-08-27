@@ -14,7 +14,12 @@ from werkzeug.utils import secure_filename
 from websocket import websocket_handlers
 from utils.metrics import calculate_power_consumption, calculate_emissions
 from demo import BenchmarkDataError, get_benchmark_from_csv
+from model.generative_model.predict_generative import get_dropdown_models
+from model.generative_model.benchmark_generative import generate_completion
+from loading import load_huggingface_generative_model
 import numpy as np
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 # ---- constants / paths ----
@@ -65,8 +70,14 @@ print(f"[Sustainability] Final STATIC_DIR: {STATIC_DIR}", flush=True)
 app = Flask(__name__, static_folder=STATIC_DIR, static_url_path="")
 CORS(app)
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading",
-                    logger=True, engineio_logger=True)
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode="threading",
+    allow_upgrades=False,
+    logger=True,
+    engineio_logger=True,
+)
 
 # Register websocket handlers
 websocket_handlers(socketio)
@@ -87,6 +98,7 @@ def serve_frontend():
 @app.route('/loading-upload')
 @app.route('/loading-benchmark')
 @app.route('/benchmark-results')
+@app.route('/generative-results')
 def spa_direct_named():
     idx = os.path.join(app.static_folder or '', 'index.html')
     if app.static_folder and os.path.exists(idx):
@@ -103,7 +115,8 @@ def spa_fallback(subpath: str):
     """
     # Known backend prefixes; let them 404 naturally or be handled by their own routes
     api_prefixes = (
-        'upload', 'benchmark', 'chart-data', 'settings', 'socket.io', 'save_columns'
+        'upload', 'benchmark', 'chart-data', 'settings', 'socket.io', 'save_columns',
+        'generative', 'api/'
     )
     if subpath.startswith(api_prefixes):
         # Let API 404 be explicit
@@ -143,13 +156,18 @@ def upload_data():
         return jsonify({"upload_id": "demo"}), 200
 
     huggingface_url = request.form.get("huggingface_url", "").strip()
+    model_type = request.form.get("model_type", "classification").strip().lower()
+    preset_model = request.form.get("preset_model", "").strip()
     model = request.files.get("model")
     dataset = request.files.get("dataset")
 
+    if model_type not in ("classification", "generative"):
+        model_type = "classification"
+
     # basic validation
-    if not huggingface_url and not model:
-        return jsonify({"error": "Either a HuggingFace URL or a model file must be provided"}), 400
-    if not dataset:
+    if not huggingface_url and not model and not preset_model:
+        return jsonify({"error": "Either a HuggingFace URL, a model file, or a preset model must be provided"}), 400
+    if not dataset and model_type != "generative":
         return jsonify({"error": "Dataset file is required"}), 400
     if model and not model.filename.lower().endswith((".h5", ".keras")):
         return jsonify({"error": "Model file must be a .h5 or .keras file"}), 400
@@ -162,19 +180,31 @@ def upload_data():
     socketio.emit("status", {"message": f"[UPLOAD DEBUG] Saving upload to: {upload_path}"})
     os.makedirs(upload_path, exist_ok=True)
 
+    with open(os.path.join(upload_path, "model_type.json"), "w", encoding="utf-8") as f:
+        json.dump({"model_type": model_type}, f, ensure_ascii=False, indent=2)
+
     # persist HF URL
     if huggingface_url:
         with open(os.path.join(upload_path, "huggingface_url.txt"), "w", encoding="utf-8") as f:
             f.write(huggingface_url)
+
+    # persist preset model name
+    if preset_model:
+        with open(os.path.join(upload_path, "preset_model.txt"), "w", encoding="utf-8") as f:
+            f.write(preset_model)
+        # Also save as HF URL for model loading (preset names map to HF repos)
+        if not huggingface_url:
+            with open(os.path.join(upload_path, "huggingface_url.txt"), "w", encoding="utf-8") as f:
+                f.write(preset_model)
 
     # save model if provided
     if model:
         model_path = os.path.join(upload_path, secure_filename(model.filename))
         model.save(model_path)
 
-    # save dataset
+    # save dataset under a canonical name used by websocket pipeline
     if dataset:
-        dataset_path = os.path.join(upload_path, secure_filename(dataset.filename))
+        dataset_path = os.path.join(upload_path, "dataset.csv")
         dataset.save(dataset_path)
 
     # persist selected columns if the form sent them (target only)
@@ -202,6 +232,12 @@ def get_settings():
             "metrics": PERFORMANCE_METRICS,
         }
     )
+
+# ---- preset generative models ----
+@app.get("/api/preset-models")
+def get_preset_model_list():
+    """Return the list of preset generative models (val + test)."""
+    return jsonify({"models": get_dropdown_models()})
 
 # ---- chart data ----
 @app.get("/chart-data/<upload_id>/<gpu>/<location>")
@@ -241,12 +277,15 @@ def get_chart_data(upload_id, gpu, location):
     # Build the four series. Keys must be strings; values must be numbers.
     tflops, power, emissions, perf = {}, {}, {}, {}
 
-    # Your GPU/location calculators
+    # GPU/location calculators
     gpu_data = GRAPHICSCARD_MAPPING.get(gpu) or {"power": 0, "compute": 0}
     carbon_intensity = LOCATION_CARBON_MAPPING.get(location, 0)
 
+    perplexity = {}
     for k, v in pruned_data.items():
-        key = str(k)  # JSON keys are strings in the frontend anyway
+        # Normalize key: JavaScript uses "0" not "0.0" for whole numbers
+        num = float(k)
+        key = str(int(num)) if num == int(num) else str(num)
         flops = v.get("flops", 0.0)
         performance = v.get("accuracy", 0.0)
 
@@ -255,12 +294,19 @@ def get_chart_data(upload_id, gpu, location):
         emissions[key] = calculate_emissions(gpu_data, flops, carbon_intensity)
         perf[key] = performance * 100.0
 
-    return jsonify({
+        if "perplexity" in v:
+            perplexity[key] = v["perplexity"]
+
+    result = {
         "tflops": tflops,
         "power": power,
         "emissions": emissions,
         "performance": perf,
-    })
+    }
+    if perplexity:
+        result["perplexity"] = perplexity
+
+    return jsonify(result)
 
 # ---- benchmark data ----
 @app.get("/benchmark/<upload_id>")
@@ -335,7 +381,9 @@ def get_benchmark_data(upload_id):
         "originalParameters": data.get("originalParameters"),
         "prunedParameters": data.get("prunedParameters"),
         "metricCards": metric_cards,
-        "realBenchmark": data.get("realBenchmark", {})
+        "realBenchmark": data.get("realBenchmark", {}),
+        "textExamples": data.get("textExamples", []),
+        "generationExample": data.get("generationExample"),
     }
     return jsonify(resp)
 
@@ -350,6 +398,96 @@ def export_model(upload_id):
         return send_file(zip_path, as_attachment=True, download_name="pruned_model.zip")
     except Exception as e:
         return {"error": str(e)}, 500
+
+
+# ---- generative dashboard data ----
+@app.get("/generative/<upload_id>")
+def get_generative_data(upload_id):
+    """Return the structured GenerativeDashboardData for a generative upload."""
+    upload_path = os.path.join(UPLOAD_DIR, upload_id)
+    data_path = os.path.join(upload_path, "generative_dashboard_data.json")
+    if not os.path.exists(data_path):
+        return jsonify({"error": "Generative dashboard data not found"}), 404
+
+    with open(data_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    return jsonify(data)
+
+# ---- in-memory model cache for generation ----
+_generation_cache = {}  # keyed by upload_id → { "original": model, "pruned": model, "tokenizer": tok, "device": dev }
+
+
+@app.route("/api/generate", methods=["POST"])
+def api_generate():
+    """Generate text from both original and pruned models for side-by-side comparison."""
+    body = request.get_json(silent=True) or {}
+    upload_id = body.get("upload_id")
+    prompt = body.get("prompt", "").strip()
+
+    if not upload_id or not prompt:
+        return jsonify({"error": "upload_id and prompt are required"}), 400
+
+    upload_path = os.path.join(UPLOAD_DIR, upload_id)
+    pruned_dir = os.path.join(upload_path, "pruned_model_hf")
+    hf_url_file = os.path.join(upload_path, "huggingface_url.txt")
+
+    if not os.path.isdir(pruned_dir):
+        return jsonify({"error": "No pruned model found. Run a benchmark first."}), 404
+
+    try:
+        # Load models (cached per upload_id)
+        if upload_id not in _generation_cache:
+            # Read original model name
+            if not os.path.exists(hf_url_file):
+                return jsonify({"error": "Original model reference not found."}), 404
+
+            with open(hf_url_file, "r") as f:
+                hf_repo = f.read().strip()
+
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            dtype = torch.float16 if device == "cuda" else torch.float32
+
+            tokenizer = AutoTokenizer.from_pretrained(hf_repo, trust_remote_code=True)
+            if tokenizer.pad_token is None:
+                tokenizer.pad_token = tokenizer.eos_token
+
+            original_model = AutoModelForCausalLM.from_pretrained(
+                hf_repo, torch_dtype=dtype, trust_remote_code=True,
+            )
+            original_model.to(device).eval()
+            original_model.config.pad_token_id = tokenizer.pad_token_id
+
+            pruned_model = AutoModelForCausalLM.from_pretrained(
+                pruned_dir, torch_dtype=dtype, trust_remote_code=True,
+            )
+            pruned_model.to(device).eval()
+            pruned_model.config.pad_token_id = tokenizer.pad_token_id
+
+            _generation_cache[upload_id] = {
+                "original": original_model,
+                "pruned": pruned_model,
+                "tokenizer": tokenizer,
+                "device": device,
+            }
+
+        cached = _generation_cache[upload_id]
+        original_text = generate_completion(
+            cached["original"], cached["tokenizer"], prompt,
+            device=cached["device"], max_new_tokens=80,
+        )
+        pruned_text = generate_completion(
+            cached["pruned"], cached["tokenizer"], prompt,
+            device=cached["device"], max_new_tokens=80,
+        )
+
+        return jsonify({
+            "original": original_text,
+            "pruned": pruned_text,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/shutdown', methods=['POST'])
 def shutdown():

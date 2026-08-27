@@ -1,0 +1,58 @@
+{
+  "approach": "local_interpolation",
+  "anchor_thresholds": [
+    0.0,
+    10.0
+  ],
+  "n_anchors": 2,
+  "feature_cols_ppl": [
+    "threshold",
+    "left_log_ppl",
+    "right_log_ppl",
+    "span",
+    "relative_position",
+    "total_params",
+    "total_layers",
+    "original_flops"
+  ],
+  "note": "FLOPs are calculated directly by pruning \u2014 no FLOPs GP needed",
+  "train_models": [
+    "gpt2",
+    "gpt2-medium",
+    "gpt2-large",
+    "opt-125m",
+    "opt-350m",
+    "opt-2.7b",
+    "phi-1.5",
+    "phi-2",
+    "llama-3.2-1b",
+    "llama-3.2-3b",
+    "qwen2.5-1.5b",
+    "qwen2.5-3b"
+  ],
+  "validation_models": [
+    "gpt2-xl",
+    "bloom-1.7b"
+  ],
+  "test_models": [
+    "opt-1.3b",
+    "pythia-1.4b"
+  ],
+  "excluded_models": [
+    "gemma-2b"
+  ],
+  "random_state": 67,
+  "exported_at": "2026-05-04T14:33:03.845731",
+  "val_metrics": {
+    "gpt2-xl": {
+      "ppl_r2": 0.5095801204747556,
+      "ppl_r2_log": 0.6584364218473736,
+      "ppl_mae": 3472.8823689730034
+    },
+    "bloom-1.7b": {
+      "ppl_r2": -0.01894196337869225,
+      "ppl_r2_log": -0.7376041577877481,
+      "ppl_mae": 701515652.5808218
+    }
+  }
+}

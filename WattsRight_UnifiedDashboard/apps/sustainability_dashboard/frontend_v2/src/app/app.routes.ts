@@ -4,6 +4,7 @@ import { UploadLoaderComponent } from '@app/pages/loaders/upload-loader/upload-l
 import { LandingPageComponent } from '@app/pages/landing-page/landing-page.component';
 import { BenchmarkLoaderComponent } from '@app/pages/loaders/benchmark-loader/benchmark-loader.component';
 import { BenchmarkResultsComponent } from '@app/pages/benchmark-results/benchmark-results.component';
+import { GenerativeResultsComponent } from '@app/pages/generative-results/generative-results.component';
 import { BenchmarkResolver } from '@app/services/benchmark-resolver.service';
 
 export const routes: Routes = [
@@ -28,5 +29,9 @@ export const routes: Routes = [
     path: 'benchmark-results',
     component: BenchmarkResultsComponent,
     resolve: { benchmark: BenchmarkResolver },   // ✅ only here!
+  },
+  {
+    path: 'generative-results',
+    component: GenerativeResultsComponent,
   },
 ];

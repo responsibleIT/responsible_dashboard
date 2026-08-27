@@ -105,20 +105,21 @@
 
 /* Sidebar */
 .sidebar {
-  width: 400px;
-  height: auto; // Auto height on desktop
-  background: transparent; // Transparent on desktop so card shows through
+  width: 340px;
+  max-height: 100%;
+  overflow-y: auto;
+  background: transparent;
   transition: transform 0.3s ease;
   z-index: 1000;
   position: relative;
   flex-shrink: 0;
 
   @media (max-width: 1200px) {
-    width: 350px;
+    width: 300px;
   }
 
   @media (max-width: 1024px) {
-    width: 320px;
+    width: 280px;
   }
 }
 

@@ -17,6 +17,62 @@
   padding: 1rem 3rem;
   box-sizing: border-box;
 
+  .toggle-group {
+    display: flex;
+    gap: 0;
+    justify-content: center;
+    width: 100%;
+    border: 1px solid var(--border-color-primary);
+    border-radius: 20px;
+    overflow: hidden;
+    position: relative;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 8px;
+      bottom: 8px;
+      left: 50%;
+      width: 1px;
+      transform: translateX(-0.5px);
+      background-color: var(--border-color-primary);
+      transition: opacity 0.2s ease;
+      pointer-events: none;
+    }
+
+    .toggle-btn {
+      height: 45px;
+      min-width: 0;
+      flex: 1;
+      padding: 0 20px;
+      border: none;
+      background: var(--color-white);
+      cursor: pointer;
+      font-family: prompt-button, sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      line-height: normal;
+      text-transform: uppercase;
+      color: var(--color-deeptrust);
+      transition: background-color 0.2s ease, color 0.2s ease;
+      position: relative;
+
+      &.active {
+        background-color: var(--color-deeptrust);
+        color: var(--color-true-clear);
+        border-radius: 14px;
+        z-index: 1;
+        box-shadow: 0 2px 6px rgba(14, 16, 69, 0.25);
+      }
+    }
+
+    &:has(.toggle-btn:last-child.active) {
+      &::after {
+        opacity: 0;
+      }
+    }
+  }
+
   &__form {
     display: flex;
     flex-direction: column;
@@ -41,6 +97,122 @@
         flex-direction: column;
         gap: 1rem;
         width: 100%;
+
+        // Tab-based input method selector (generative)
+        .input-method-tabs {
+          display: flex;
+          gap: 0.5rem;
+          width: 100%;
+
+          .method-tab {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.6rem 0.5rem;
+            border: 2px solid var(--border-color-primary);
+            border-radius: 8px;
+            background: var(--color-white);
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            &:hover {
+              border-color: var(--color-deeptrust);
+              background: rgba(14, 16, 69, 0.03);
+            }
+
+            &.active {
+              border-color: var(--color-eco-green);
+              background: rgba(0, 235, 175, 0.06);
+              box-shadow: 0 0 0 1px var(--color-eco-green);
+            }
+
+            .method-icon {
+              font-size: 1.2rem;
+            }
+
+            .method-label {
+              font-size: 0.7rem;
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+              color: var(--color-deeptrust);
+            }
+          }
+        }
+
+        // Method panel (visible per active tab)
+        .method-panel {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.5rem;
+          width: 100%;
+          animation: fadeIn 0.2s ease;
+
+          app-form-input-text {
+            width: 70%;
+          }
+
+          .method-description {
+            font-size: 0.78rem;
+            color: var(--color-grayish);
+            text-align: center;
+            margin: 0;
+            line-height: 1.4;
+            max-width: 340px;
+
+            a {
+              color: var(--color-text-link);
+              text-decoration: underline;
+              text-underline-offset: 2px;
+            }
+          }
+
+          select {
+            width: 100%;
+            max-width: 300px;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color-primary);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background-color: var(--color-white);
+            cursor: pointer;
+
+            &:focus {
+              outline: none;
+              border-color: var(--color-deeptrust);
+            }
+          }
+
+          .validation-feedback {
+            font-size: 0.75rem;
+            text-align: center;
+
+            .error { color: var(--color-text-error); }
+            .success { color: var(--color-text-success); }
+          }
+        }
+
+        // Privacy notice
+        .privacy-notice {
+          display: flex;
+          align-items: flex-start;
+          gap: 0.5rem;
+          padding: 0.6rem 0.75rem;
+          background: rgba(0, 235, 175, 0.06);
+          border: 1px solid rgba(0, 235, 175, 0.2);
+          border-radius: 6px;
+          font-size: 0.7rem;
+          color: var(--color-grayish);
+          line-height: 1.4;
+
+          .privacy-icon {
+            font-size: 0.85rem;
+            flex-shrink: 0;
+          }
+        }
 
         .or {
           position: relative;
@@ -71,6 +243,37 @@
           align-items: center;
           gap: 0.5rem;
         }
+
+        .preset-model {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.5rem;
+          width: 100%;
+
+          label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--color-deeptrust);
+            text-transform: uppercase;
+          }
+
+          select {
+            width: 100%;
+            max-width: 300px;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color-primary);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background-color: var(--color-white);
+            cursor: pointer;
+
+            &:focus {
+              outline: none;
+              border-color: var(--color-deeptrust);
+            }
+          }
+        }
       }
 
       &.dataset-section, .model-upload {
@@ -93,4 +296,9 @@
       margin-top: 1rem;
     }
   }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }

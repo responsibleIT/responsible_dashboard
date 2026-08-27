@@ -14,7 +14,7 @@ type ChangeType = 'positive' | 'negative' | 'neutral';
 export class BenchmarkMetricCardComponent implements OnChanges {
   @Input() metric: BenchmarkMetric | null = null;
   @Input() scientificNotation = false;
-  @Input() type: 'power' | 'performance' | 'emissions' | 'compute' = 'performance';
+  @Input() type: 'power' | 'performance' | 'emissions' | 'compute' | 'latency' = 'performance';
 
   originalValue: string | number = 0;
   prunedValue: string | number = 0;
@@ -27,7 +27,8 @@ export class BenchmarkMetricCardComponent implements OnChanges {
     power:        { header: '#6B21A8', value: '#663EB6', background: '#EFE2FE' },
     performance:  { header: '#166534', value: '#05DBAC', background: '#CBFDEC' },
     emissions:    { header: '#9A3412', value: '#EE8438', background: '#FFE6BD' },
-    compute:      { header: '#991B1B', value: '#FE17B0', background: '#FEDBEE' }
+    compute:      { header: '#991B1B', value: '#FE17B0', background: '#FEDBEE' },
+    latency:      { header: '#1E40AF', value: '#2563EB', background: '#DBEAFE' }
   };
 
   get color() { return this.colorScheme[this.type]; }
@@ -45,8 +46,8 @@ export class BenchmarkMetricCardComponent implements OnChanges {
     const orig = this.metric.original ?? 0;
     const prun = this.metric.pruned ?? 0;
 
-    this.originalValue = this.scientificNotation ? orig.toExponential(2) : orig;
-    this.prunedValue   = this.scientificNotation ? prun.toExponential(2) : prun;
+    this.originalValue = this.formatValue(orig);
+    this.prunedValue   = this.formatValue(prun);
 
     if (orig > 0) {
       this.percentageChange = ((prun - orig) / orig) * 100;
@@ -65,5 +66,13 @@ export class BenchmarkMetricCardComponent implements OnChanges {
     if (this.changeType === 'positive') return isGood ? '#16A34A' : '#DC2626';
     if (this.changeType === 'negative') return isGood ? '#DC2626' : '#16A34A';
     return '#6B7280';
+  }
+
+  private formatValue(value: number): string | number {
+    if (this.scientificNotation) return value.toExponential(2);
+    if (value === 0) return 0;
+    // Truncate to max 4 decimal places without rounding
+    const factor = 10000;
+    return Math.trunc(value * factor) / factor;
   }
 }

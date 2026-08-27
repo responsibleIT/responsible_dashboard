@@ -63,7 +63,7 @@ def evaluate_model(
         texts.append(" ".join(parts))
         labels.append(row[target_col])
 
-    # Preprocess texts (you have a helper already)
+    # Preprocess texts
     from preprocess import preprocess
     texts = [preprocess(t) for t in texts]
 

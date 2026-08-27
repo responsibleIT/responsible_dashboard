@@ -1,6 +1,18 @@
 <div class="left-menu">
   <div class="banner">
-    <h2>Check the <span style="color: var(--color-eco-green);">sustainability</span> effects by manipulating the values below</h2>
+    <h2 *ngIf="!isGenerative">Check the <span style="color: var(--color-eco-green);">sustainability</span> effects by manipulating the values below</h2>
+    <h2 *ngIf="isGenerative">Explore <span style="color: var(--color-eco-green);">surrogate predictions</span> for pruning trade-offs</h2>
+  </div>
+
+  <!-- Onboarding explanation (generative only) -->
+  <div class="section onboarding" *ngIf="isGenerative">
+    <div class="info-card">
+      <span class="info-icon">ℹ️</span>
+      <div class="info-content">
+        <strong>What am I looking at?</strong>
+        <p>This dashboard predicts how pruning affects your model's quality, speed, and environmental impact. Adjust the threshold below to explore trade-offs. These are <em>surrogate estimates</em> run a benchmark to validate.</p>
+      </div>
+    </div>
   </div>
 
   <div class="section">
@@ -9,6 +21,7 @@
       [gpus]="gpus"
       [locations]="locations"
       [metrics]="metrics"
+      [isGenerative]="isGenerative"
     />
   </div>
 
@@ -20,10 +33,36 @@
       [step]="0.1"
       [control]="formGroup.controls.threshold"
     />
+    <!-- Threshold explanation (generative only) -->
+    <div class="threshold-help" *ngIf="isGenerative">
+      <small>The threshold represents a relative weight magnitude cutoff, not a direct sparsity percentage. Higher threshold = more aggressive pruning. E.g., a threshold of 2 removes weights smaller than 2% of the strongest weight in each layer.</small>
+    </div>
+  </div>
+
+  <!-- Surrogate recommendation (generative only) -->
+  <div class="section recommendation" *ngIf="surrogateInfo">
+    <div class="rec-header">Recommended Threshold</div>
+    <p class="rec-explanation">The knee point represents the optimal balance between pruning efficiency and model quality. This is a <strong>recommendation</strong>, not an automatic decision.</p>
+    <div class="rec-row">
+      <span class="rec-label">Suggested threshold</span>
+      <span class="rec-value highlight">{{ surrogateInfo.kneeThreshold | number:'1.1-1' }}</span>
+    </div>
+    <div class="rec-row">
+      <span class="rec-label">Expected perplexity</span>
+      <span class="rec-value">{{ surrogateInfo.kneePerplexity | number:'1.1-1' }}</span>
+    </div>
+    <div class="rec-row">
+      <span class="rec-label">FLOPs reduction</span>
+      <span class="rec-value">{{ surrogateInfo.kneeFlopsReduction | number:'1.1-1' }}%</span>
+    </div>
+    <button appButton [ecogreen]="true" [fullWidth]="true"
+            (click)="formGroup.controls.threshold.setValue(surrogateInfo.kneeThreshold)">
+      Use suggested threshold
+    </button>
   </div>
 
   <div class="section">
     <button appButton [ecogreen]="true" [fullWidth]="true" (click)="runBenchmark()">Run benchmark</button>
-    <a href="/">{{ 'Go back and upload new' | uppercase }}</a>
+    <button appButton [deeptrust]="true" [fullWidth]="true" (click)="goBack()">GO BACK AND UPLOAD NEW</button>
   </div>
 </div>

@@ -33,7 +33,8 @@ export class WebsocketService {
     this.hardClosed = false;
 
     this.socket = io(this.baseUrl(), {
-      transports: ['websocket'],
+      transports: ['polling'],
+      upgrade: false,
       withCredentials: false,
       reconnection: false,
       autoConnect: true,

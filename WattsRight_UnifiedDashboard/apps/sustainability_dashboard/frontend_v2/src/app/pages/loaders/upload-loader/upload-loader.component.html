@@ -1,7 +1,39 @@
 <div class="loader-container">
-  <div class="loader">
-    <div class="spinner-ring"></div>
-    <span class="loader__text">{{ message }}</span>
+  <div class="loader-card">
+    <div class="loader-header">
+      <div class="spinner-ring"></div>
+      <h2 class="loader-title">Setting up your analysis</h2>
+      <span class="loader-message">{{ message }}</span>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="progress-section">
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" [style.width.%]="progressPercent"></div>
+      </div>
+      <span class="progress-label">Stage {{ completedStages + 1 }} of {{ stages.length }}</span>
+    </div>
+
+    <!-- Stage list -->
+    <div class="stages">
+      <div class="stage" *ngFor="let stage of stages; let i = index"
+           [ngClass]="{ 'stage--pending': stage.status === 'pending', 'stage--active': stage.status === 'active', 'stage--completed': stage.status === 'completed' }">
+        <div class="stage-indicator">
+          <span class="stage-dot" *ngIf="stage.status !== 'completed'">{{ i + 1 }}</span>
+          <span class="stage-check" *ngIf="stage.status === 'completed'">✓</span>
+        </div>
+        <div class="stage-content">
+          <span class="stage-label">{{ stage.label }}</span>
+          <span class="stage-description" *ngIf="stage.status === 'active'">{{ stage.description }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Educational hint (generative only) -->
+    <div class="hint-section" *ngIf="isGenerative && currentHint">
+      <span class="hint-icon">💡</span>
+      <span class="hint-text">{{ currentHint }}</span>
+    </div>
   </div>
 
   <button appButton [transparent]="true" (click)="onCancel()">CANCEL</button>

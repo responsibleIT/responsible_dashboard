@@ -3,5 +3,10 @@
     [metrics]="metricCards"
   />
 
-  <app-pruning-charts />
+  <app-pruning-charts
+    [isGenerative]="isGenerative"
+    [perplexityUpper]="perplexityUpper"
+    [perplexityLower]="perplexityLower"
+    [kneeThreshold]="kneeThreshold"
+  />
 </div>

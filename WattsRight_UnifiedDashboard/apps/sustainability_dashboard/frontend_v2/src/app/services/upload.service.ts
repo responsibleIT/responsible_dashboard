@@ -4,6 +4,8 @@ import { HttpClient } from '@angular/common/http';
 import { UploadResponse } from '@app/types/upload.types';
 import { environment } from '@env/environment';
 
+type ModelType = 'classification' | 'generative';
+
 @Injectable({
   providedIn: 'root'
 })
@@ -18,12 +20,18 @@ export class UploadService {
   // NEW: user selections from the upload modal
   public textColumn = new BehaviorSubject<string | null>(null);
   public targetColumn = new BehaviorSubject<string | null>(null);
+  public modelType = new BehaviorSubject<'classification' | 'generative'>('classification');
   public selectedGPU = new BehaviorSubject<string | null>(null);
   public selectedLocation = new BehaviorSubject<string | null>(null);
   public selectedMetric = new BehaviorSubject<string | null>(null);
 
   constructor(private http: HttpClient) {
     this.upload_id = new BehaviorSubject<string | null>(this.loadUploadIdFromLocalStorage());
+    // Restore model type from localStorage
+    const storedType = localStorage.getItem('model_type') as 'classification' | 'generative' | null;
+    if (storedType === 'classification' || storedType === 'generative') {
+      this.modelType = new BehaviorSubject<'classification' | 'generative'>(storedType);
+    }
   }
 
   // ----- persistence helpers -----
@@ -47,10 +55,33 @@ export class UploadService {
 
   // ----- API -----
   uploadData(formData: FormData): Observable<UploadResponse> {
+    return this.postUpload(formData);
+  }
+
+  uploadClassificationData(formData: FormData): Observable<UploadResponse> {
+    return this.postUpload(this.withModelType(formData, 'classification'));
+  }
+
+  uploadGenerativeData(formData: FormData): Observable<UploadResponse> {
+    return this.postUpload(this.withModelType(formData, 'generative'));
+  }
+
+  private postUpload(formData: FormData): Observable<UploadResponse> {
     return this.http.post(`${this.apiUrl}/upload`, formData).pipe(
       map(response => response as UploadResponse),
       catchError(error => throwError(() => new Error('Upload failed: ' + error.message)))
     );
+  }
+
+  private withModelType(formData: FormData, modelType: ModelType): FormData {
+    const payload = new FormData();
+
+    formData.forEach((value, key) => {
+      payload.append(key, value);
+    });
+
+    payload.set('model_type', modelType);
+    return payload;
   }
 
   // ----- setters (keep PascalCase names so your component code compiles) -----
@@ -81,6 +112,15 @@ export class UploadService {
     this.selectedMetric.next(metric);
   }
 
+  set ModelType(type: 'classification' | 'generative') {
+    this.modelType.next(type);
+    localStorage.setItem('model_type', type);
+  }
+
+  get modelTypeValue(): 'classification' | 'generative' {
+    return this.modelType.value;
+  }
+
   // ----- getters / convenience -----
   get modelName(): string | null {
     if (this.huggingFaceUrl.value) {
@@ -105,5 +145,6 @@ export class UploadService {
   public clearUploadId(): void {
     this.upload_id.next(null);
     this.saveUploadIdToLocalStorage(null);
+    localStorage.removeItem('model_type');
   }
 }
