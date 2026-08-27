@@ -1,12 +1,95 @@
 <div class="upload-container" data-bs-backdrop="static">
   <h2>{{ 'What do you want to analyze?' | uppercase }}</h2>
 
+  <div class="toggle-group">
+    <button type="button"
+            class="toggle-btn"
+            [ngClass]="{ active: uploadFormGroup.controls.modelType.value === 'classification' }"
+            (click)="uploadFormGroup.controls.modelType.setValue('classification')">
+      Classification
+    </button>
+    <button type="button"
+            class="toggle-btn"
+            [ngClass]="{ active: uploadFormGroup.controls.modelType.value === 'generative' }"
+            (click)="uploadFormGroup.controls.modelType.setValue('generative')">
+      Generative
+    </button>
+  </div>
+
   <form class="upload-container__form" (ngSubmit)="submitForm()" [formGroup]="uploadFormGroup">
     <!-- Model source -->
     <div class="upload-container__form__section">
       <h2 class="upload-container__form__section__title">{{ 'Model Source' | uppercase }}</h2>
 
-      <div class="upload-container__form__section__inputs model">
+      <!-- Generative model input methods with tab-style selection -->
+      <div class="upload-container__form__section__inputs model" *ngIf="uploadFormGroup.controls.modelType.value === 'generative'">
+        <div class="input-method-tabs">
+          <button type="button" class="method-tab"
+                  [class.active]="activeInputMethod === 'preset'"
+                  (click)="activeInputMethod = 'preset'"
+                  *ngIf="presetModels.length">
+            <span class="method-icon">📋</span>
+            <span class="method-label">Preset Model</span>
+          </button>
+          <button type="button" class="method-tab"
+                  [class.active]="activeInputMethod === 'huggingface'"
+                  (click)="activeInputMethod = 'huggingface'">
+            <span class="method-icon">🤗</span>
+            <span class="method-label">Hugging Face</span>
+          </button>
+          <button type="button" class="method-tab"
+                  [class.active]="activeInputMethod === 'upload'"
+                  (click)="activeInputMethod = 'upload'">
+            <span class="method-icon">📁</span>
+            <span class="method-label">Local Upload</span>
+          </button>
+        </div>
+
+        <!-- Preset model panel -->
+        <div class="method-panel" *ngIf="activeInputMethod === 'preset' && presetModels.length">
+          <p class="method-description">Use a pre-evaluated model from our validation set for quick exploration.</p>
+          <select [formControl]="uploadFormGroup.controls.presetModel">
+            <option [ngValue]="null">Select a preset model</option>
+            <option *ngFor="let m of presetModels" [value]="m">{{ m }}</option>
+          </select>
+        </div>
+
+        <!-- Hugging Face panel -->
+        <div class="method-panel" *ngIf="activeInputMethod === 'huggingface'">
+          <p class="method-description">Load a public transformer model from the
+            <a href="https://huggingface.co/models" target="_blank" rel="noopener">Hugging Face Model Hub</a>.
+          </p>
+          <app-form-input-text
+            [label]="''"
+            [placeholder]="'e.g. facebook/opt-125m, gpt2, microsoft/phi-2'"
+            [control]="uploadFormGroup.controls.huggingfaceModel"
+            [required]="false">
+          </app-form-input-text>
+          <div class="validation-feedback" *ngIf="hfValidationMessage">
+            <span [class.error]="hfValidationError" [class.success]="!hfValidationError">{{ hfValidationMessage }}</span>
+          </div>
+        </div>
+
+        <!-- Upload panel -->
+        <div class="method-panel" *ngIf="activeInputMethod === 'upload'">
+          <p class="method-description">Upload your own local model weights for analysis.</p>
+          <app-form-input-file
+            [placeholder]="'Upload model'"
+            [control]="uploadFormGroup.controls.h5Model"
+            [required]="false">
+          </app-form-input-file>
+          <small>Accepted: .h5 / .keras</small>
+        </div>
+
+        <!-- Privacy notice for generative models -->
+        <div class="privacy-notice">
+          <span class="privacy-icon">🔒</span>
+          <span>Uploaded models are processed locally and are not retained after analysis. No training occurs on your data.</span>
+        </div>
+      </div>
+
+      <!-- Classification model inputs (unchanged) -->
+      <div class="upload-container__form__section__inputs model" *ngIf="uploadFormGroup.controls.modelType.value === 'classification'">
         <!-- Hugging Face URL -->
         <app-form-input-text
           [label]="''"
@@ -29,19 +112,19 @@
           </app-form-input-file>
           <small>Accepted: .h5 / .keras</small>
         </div>
+      </div>
 
-        <!-- Either/Or validation messages -->
-        <div class="error-message" *ngIf="neitherFieldFilledError">
-          Please provide either a Hugging Face URL or upload a model file.
-        </div>
-        <div class="error-message" *ngIf="bothFieldsFilledError">
-          Provide either a Hugging Face URL or upload a model, not both.
-        </div>
+      <!-- Validation messages -->
+      <div class="error-message" *ngIf="neitherFieldFilledError">
+        Please provide a preset model, a Hugging Face URL, or upload a model file.
+      </div>
+      <div class="error-message" *ngIf="bothFieldsFilledError">
+        Provide either a Hugging Face URL or upload a model, not both.
       </div>
     </div>
 
-    <!-- Dataset -->
-    <div class="upload-container__form__section dataset-section">
+    <!-- Dataset (classification only) -->
+    <div class="upload-container__form__section dataset-section" *ngIf="uploadFormGroup.controls.modelType.value === 'classification'">
       <h2>{{ 'Dataset (Required)' | uppercase }}</h2>
 
       <app-form-input-file #ds
@@ -56,7 +139,7 @@
     </div>
 
     <!-- TARGET COLUMN (appears only after we parsed headers) -->
-    <div class="upload-container__form__section" *ngIf="csvColumns.length">
+    <div class="upload-container__form__section" *ngIf="uploadFormGroup.controls.modelType.value === 'classification' && csvColumns.length">
       <h2>{{ 'Target column' | uppercase }}</h2>
         <input type="text"
               placeholder="e.g., label, target, class"

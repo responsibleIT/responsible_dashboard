@@ -10,6 +10,8 @@ import {firstValueFrom, map, Subscription} from 'rxjs';
 import {SettingsService} from '@app/services/settings.service';
 import {PruningDataService} from '@app/services/pruning-data.service';
 import {UploadService} from '@app/services/upload.service';
+import {GenerativeDataService} from '@app/services/generative-data.service';
+import {SurrogateInfo} from '@app/types/generative.types';
 import {Router} from '@angular/router';
 import {
   PruningResultsComponent
@@ -31,6 +33,13 @@ import {
 export class PruningAdjustmentsComponent implements OnInit, OnDestroy {
 
   public isMobileMenuOpen = false;
+  public isGenerative = false;
+  public surrogateInfo: SurrogateInfo | null = null;
+
+  // Perplexity chart overlays (generative only)
+  public perplexityUpper: Record<number, number> = {};
+  public perplexityLower: Record<number, number> = {};
+  public kneeThreshold: number | null = null;
   public gpus: { value: string, label: string }[] = [];
   public locations: { value: string, label: string }[] = [];
   public metrics: { value: string, label: string }[] = [];
@@ -102,6 +111,7 @@ export class PruningAdjustmentsComponent implements OnInit, OnDestroy {
     private readonly settingsService: SettingsService,
     private readonly pruningDataService: PruningDataService,
     private readonly uploadService: UploadService,
+    private readonly generativeDataService: GenerativeDataService,
     private readonly router: Router,
     private readonly cdr: ChangeDetectorRef
   ) {
@@ -110,6 +120,39 @@ export class PruningAdjustmentsComponent implements OnInit, OnDestroy {
   ngOnInit() {
     if (!this.uploadService.upload_id) {
       this.router.navigate(['/']);
+    }
+
+    this.isGenerative = this.uploadService.modelTypeValue === 'generative';
+    console.log('[pruning-adjustments] modelType =', this.uploadService.modelTypeValue, '| isGenerative =', this.isGenerative);
+
+    if (this.isGenerative) {
+      this.metricCards.performance = {
+        title: 'Predicted perplexity',
+        unit: 'PPL',
+        values: []
+      };
+
+      // Fetch surrogate info for knee recommendation
+      const uid = this.uploadService.upload_id.value;
+      if (uid) {
+        this.generativeDataService.fetchData(uid).subscribe((data) => {
+          if (data?.surrogateInfo) {
+            this.surrogateInfo = data.surrogateInfo;
+
+            // Knee threshold for vertical marker on chart
+            this.kneeThreshold = data.surrogateInfo.kneeThreshold;
+
+            // Build uncertainty band from runs
+            for (const run of data.runs) {
+              const std = run.perplexityStd ?? 0;
+              this.perplexityUpper[run.threshold] = run.perplexity + std;
+              this.perplexityLower[run.threshold] = Math.max(0, run.perplexity - std);
+            }
+
+            this.cdr.detectChanges();
+          }
+        });
+      }
     }
 
     this.subscriptions.add(this.settingsFormGroup.controls.threshold.valueChanges.subscribe(threshold => {
@@ -193,18 +236,27 @@ export class PruningAdjustmentsComponent implements OnInit, OnDestroy {
             Object.entries(obj || {}).forEach(([k, v]) => out[String(k)] = Number(v ?? 0));
             return out;
           };
-          return {
+          const result: any = {
             performance: toStrKeys(data.performance),
             power: toStrKeys(data.power),
             emissions: toStrKeys(data.emissions),
             tflops: toStrKeys(data.tflops),
           };
+          if ((data as any).perplexity) {
+            result.perplexity = toStrKeys((data as any).perplexity);
+          }
+          return result;
         }),
       )
     ).then((data) => {
-      console.log('[chart-data]', data); // <— quick sanity log
+      console.log('[chart-data]', data); // <- quick sanity log
 
-      this.metricCards.performance.values = data.performance;
+      // For generative models, use perplexity instead of accuracy for the performance card
+      if (this.isGenerative && data.perplexity && Object.keys(data.perplexity).length > 0) {
+        this.metricCards.performance.values = data.perplexity;
+      } else {
+        this.metricCards.performance.values = data.performance;
+      }
       this.metricCards.power.values = data.power;
       this.metricCards.emissions.values = data.emissions;
       this.metricCards.compute.values = data.tflops;

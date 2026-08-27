@@ -1,0 +1,512 @@
+<div class="generative-results" *ngIf="!loading; else loadingState">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-card">
+      <div class="sr-banner">
+        <h2>Generative Model Evaluation</h2>
+      </div>
+
+      <div class="sr-body">
+        <label class="threshold-label">Compare at threshold</label>
+        <div class="threshold-control">
+          <input
+            type="range"
+            [min]="0"
+            [max]="(data?.runs?.length ?? 1) - 1"
+            [value]="selectedThreshold"
+            (input)="onThresholdChange($event)"
+          />
+          <span class="threshold-value">{{ data?.runs?.[selectedThreshold]?.threshold ?? selectedThreshold }}</span>
+        </div>
+        <small class="threshold-hint">Adjusts the pruning level for comparison. Higher values = more aggressive pruning.</small>
+      </div>
+
+      <div class="sr-body">
+        <div class="kv">
+          <span class="label">Base perplexity</span>
+          <span class="value">{{ data?.runs?.[0]?.perplexity | number:'1.1-1' }}</span>
+        </div>
+        <div class="kv">
+          <span class="label">Selected threshold</span>
+          <span class="value">{{ thresholdFromSettings !== null ? (thresholdFromSettings | number:'1.1-1') : selectedThreshold }}</span>
+        </div>
+        <div class="kv">
+          <span class="label">Sparsity</span>
+          <span class="value">{{ (data?.runs?.[selectedThreshold]?.sparsity ?? 0) * 100 | number:'1.0-0' }}%</span>
+        </div>
+        <div class="kv">
+          <span class="label">Memory</span>
+          <span class="value">{{ data?.runs?.[selectedThreshold]?.memoryMb | number:'1.0-0' }} MB</span>
+        </div>
+      </div>
+
+      <!-- Predicted vs Actual comparison (shown after benchmark) -->
+      <div class="sr-body" *ngIf="benchmarkData">
+        <div class="section-header comparison">
+          <span>Predicted vs Actual</span>
+        </div>
+        <p class="comparison-note">Comparing surrogate predictions with real benchmark measurements.</p>
+        <div class="comparison-row">
+          <span class="comp-label"></span>
+          <span class="comp-header">Predicted</span>
+          <span class="comp-header">Actual</span>
+        </div>
+        <div class="comparison-row" *ngIf="predictedPerplexity !== null && actualPerplexity !== null">
+          <span class="comp-label">Perplexity</span>
+          <span class="comp-value">{{ predictedPerplexity | number:'1.1-1' }}</span>
+          <span class="comp-value actual">{{ actualPerplexity | number:'1.1-1' }}</span>
+        </div>
+        <div class="comparison-row" *ngIf="predictedFlopsReduction !== null && actualFlopsReduction !== null">
+          <span class="comp-label">FLOPs reduction</span>
+          <span class="comp-value">{{ predictedFlopsReduction | number:'1.1-1' }}%</span>
+          <span class="comp-value actual">{{ actualFlopsReduction | number:'1.1-1' }}%</span>
+        </div>
+      </div>
+
+      <!-- Export section -->
+      <div class="sr-body" *ngIf="benchmarkData">
+        <button class="btn-export" (click)="exportModel()">
+          <span>⬇</span> Export pruned model
+        </button>
+        <small class="export-info" *ngIf="exportMessage">{{ exportMessage }}</small>
+      </div>
+
+      <div class="sr-body">
+        <a class="btn-back" (click)="goBack()">GO BACK AND CHANGE SETTINGS</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main content ── -->
+  <section class="main">
+
+    <!-- Tab navigation for section scalability -->
+    <div class="tab-nav">
+      <button class="tab-btn" [class.active]="activeSection === 'summary'" (click)="activeSection = 'summary'">Summary</button>
+      <button class="tab-btn" [class.active]="activeSection === 'analysis'" (click)="activeSection = 'analysis'">Token Analysis</button>
+      <button class="tab-btn" [class.active]="activeSection === 'generation'" (click)="activeSection = 'generation'">Generation Test</button>
+      <button class="tab-btn" [class.active]="activeSection === 'transparency'" (click)="activeSection = 'transparency'">Transparency</button>
+    </div>
+
+    <!-- ═══ SUMMARY TAB ═══ -->
+    <div class="tab-content" *ngIf="activeSection === 'summary'">
+      <!-- KPI cards -->
+      <div class="kpi-grid">
+        <div class="kpi-wrapper">
+          <app-benchmark-metric-card
+            *ngIf="perplexityCard"
+            [metric]="perplexityCard"
+            [type]="'performance'">
+          </app-benchmark-metric-card>
+          <small class="kpi-help">Lower perplexity indicates better language modelling performance.</small>
+        </div>
+
+        <div class="kpi-wrapper">
+          <app-benchmark-metric-card
+            *ngIf="energyCard"
+            [metric]="energyCard"
+            [type]="'power'"
+            [scientificNotation]="false">
+          </app-benchmark-metric-card>
+          <small class="kpi-help">Energy consumed per 1000 inference calls. Lower is more sustainable.</small>
+        </div>
+
+        <div class="kpi-wrapper">
+          <app-benchmark-metric-card
+            *ngIf="co2Card"
+            [metric]="co2Card"
+            [type]="'emissions'">
+          </app-benchmark-metric-card>
+          <small class="kpi-help">CO₂ equivalent emissions based on the energy grid at the selected location.</small>
+        </div>
+
+        <div class="kpi-wrapper">
+          <app-benchmark-metric-card
+            *ngIf="latencyCard"
+            [metric]="latencyCard"
+            [type]="'latency'">
+          </app-benchmark-metric-card>
+          <small class="kpi-help">Response time per inference call. Lower latency improves user experience.</small>
+        </div>
+
+        <div class="kpi-wrapper">
+          <app-benchmark-metric-card
+            *ngIf="flopsCard"
+            [metric]="flopsCard"
+            [type]="'compute'"
+            [scientificNotation]="true">
+          </app-benchmark-metric-card>
+          <small class="kpi-help">Computational operations needed. Lower FLOPs reduce compute cost and energy use.</small>
+        </div>
+      </div>
+
+      <!-- All charts -->
+      <div class="charts-grid">
+        <div class="chart-container">
+          <app-chart
+            [chartTitle]="'Perplexity vs Pruning Threshold'"
+            [xAxisLabel]="'THRESHOLD'"
+            [yAxisLabel]="'PERPLEXITY (PPL)'"
+            [data]="perplexityChart"
+            [rounding]="1"
+            [titleColor]="'#05DBAC'"
+            [lineColor]="'#05DBAC'"
+            [uncertaintyUpper]="perplexityUpper"
+            [uncertaintyLower]="perplexityLower"
+            [markerX]="surrogateInfo?.kneeThreshold ?? null"
+            [markerLabel]="'Knee'"
+            [markerColor]="'#FF6B35'"
+          />
+        </div>
+        <div class="chart-container">
+          <app-chart
+            [chartTitle]="'Tokens per second'"
+            [xAxisLabel]="'THRESHOLD'"
+            [yAxisLabel]="'TOKENS/SEC'"
+            [data]="tokensPerSecChart"
+            [rounding]="0"
+            [titleColor]="'#FE17B0'"
+            [lineColor]="'#FE17B0'"
+          />
+        </div>
+        <div class="chart-container">
+          <app-chart
+            [chartTitle]="'Energy (per 1k calls)'"
+            [xAxisLabel]="'THRESHOLD'"
+            [yAxisLabel]="'ENERGY (kWh)'"
+            [data]="energyChart"
+            [rounding]="2"
+            [titleColor]="'#663EB6'"
+            [lineColor]="'#663EB6'"
+          />
+        </div>
+        <div class="chart-container">
+          <app-chart
+            [chartTitle]="'CO₂ emissions (per 1k calls)'"
+            [xAxisLabel]="'THRESHOLD'"
+            [yAxisLabel]="'CO₂ (grams)'"
+            [data]="co2Chart"
+            [rounding]="1"
+            [titleColor]="'#EE8438'"
+            [lineColor]="'#EE8438'"
+          />
+        </div>
+        <div class="chart-container">
+          <app-chart
+            [chartTitle]="'FLOPs'"
+            [xAxisLabel]="'THRESHOLD'"
+            [yAxisLabel]="'GFLOPs'"
+            [data]="flopsChart"
+            [rounding]="0"
+            [titleColor]="'#FE17B0'"
+            [lineColor]="'#FE17B0'"
+          />
+        </div>
+        <div class="chart-container">
+          <app-chart
+            [chartTitle]="'Latency'"
+            [xAxisLabel]="'THRESHOLD'"
+            [yAxisLabel]="'LATENCY (ms)'"
+            [data]="latencyChart"
+            [rounding]="0"
+            [titleColor]="'#2563EB'"
+            [lineColor]="'#2563EB'"
+          />
+        </div>
+      </div>
+
+      <!-- Sustainability context card -->
+      <div class="sustainability-context" *ngIf="data?.runs?.[selectedThreshold] as run">
+        <div class="context-card">
+          <div class="context-row">
+            <span class="context-label">Energy savings</span>
+            <span class="context-value">{{ ((1 - run.energyKwhPer1kCalls / (data?.runs?.[0]?.energyKwhPer1kCalls ?? 1)) * 100) | number:'1.0-0' }}% reduction</span>
+          </div>
+          <div class="context-row">
+            <span class="context-label">Compute savings</span>
+            <span class="context-value">{{ run.flopsReductionPct | number:'1.0-0' }}% fewer FLOPs</span>
+          </div>
+          <p class="context-note">Pruning at this threshold reduces inference compute by {{ run.flopsReductionPct | number:'1.0-0' }}%, which proportionally reduces energy consumption and carbon emissions for every inference call.</p>
+        </div>
+      </div>
+
+      <!-- Drilldown: Sequence length buckets -->
+      <div class="drilldown-section" *ngIf="lengthBuckets.length">
+        <div class="section-header">
+          <hr><span>Perplexity by Sequence Length</span><hr>
+        </div>
+        <div class="bucket-table">
+          <div class="bucket-row bucket-header">
+            <span>Range</span>
+            <span>Avg Length</span>
+            <span>Base PPL</span>
+            <span>Pruned PPL</span>
+            <span>Δ</span>
+          </div>
+          <div class="bucket-row" *ngFor="let b of lengthBuckets">
+            <span>{{ b.range }}</span>
+            <span>{{ b.avgLength }}</span>
+            <span>{{ b.basePerplexity | number:'1.1-1' }}</span>
+            <span>{{ b.prunedPerplexity | number:'1.1-1' }}</span>
+            <span [class.degraded]="b.prunedPerplexity > b.basePerplexity">
+              +{{ ((b.prunedPerplexity - b.basePerplexity) / b.basePerplexity * 100) | number:'1.1-1' }}%
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ TOKEN ANALYSIS TAB ═══ -->
+    <div class="tab-content" *ngIf="activeSection === 'analysis'">
+      <div class="analysis-intro">
+        <div class="info-card">
+          <span class="info-icon">🔍</span>
+          <div class="info-content">
+            <strong>Token Prediction Quality</strong>
+            <p>Examining how pruning changes prediction confidence at the token level. Token rank shifts show whether the pruned model still assigns high probability to the correct next token. Rank 1 means the correct token is the model's top prediction.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bucket-examples" *ngIf="textExamples.length">
+        <div class="bucket-card" *ngFor="let ex of textExamples; let i = index">
+          <div class="collapsible-header" (click)="toggleExample(i)">
+            <div class="bucket-head">
+              <span class="bucket-label">{{ ex.bucket }}</span>
+              <span class="bucket-meta">{{ ex.numTokens }} tokens</span>
+              <span class="bucket-delta" [class.degraded]="ex.deltaPct > 25">
+                Δ {{ ex.deltaPct > 0 ? '+' : '' }}{{ ex.deltaPct | number:'1.1-1' }}%
+              </span>
+            </div>
+            <span class="collapse-icon">{{ expandedExamples[i] ? '▼' : '▶' }}</span>
+          </div>
+
+          <div class="collapsible-body" *ngIf="expandedExamples[i]">
+            <p class="bucket-passage">{{ ex.text }}</p>
+
+            <div class="ppl-row">
+              <div class="ppl-card original-ppl">
+                <span class="ppl-label">Original PPL</span>
+                <span class="ppl-value">{{ ex.originalPerplexity | number:'1.1-1' }}</span>
+              </div>
+              <div class="ppl-card pruned-ppl">
+                <span class="ppl-label">Pruned PPL</span>
+                <span class="ppl-value">{{ ex.prunedPerplexity | number:'1.1-1' }}</span>
+              </div>
+            </div>
+
+            <div class="token-positions" *ngIf="ex.positions?.length">
+              <div class="tp-header">Token Predictions at Sampled Positions</div>
+
+              <div class="position-card" *ngFor="let pos of ex.positions">
+                <div class="pos-context-row">
+                  <span class="pos-context">{{ pos.context }}</span>
+                  <span class="pos-arrow">→</span>
+                  <strong class="pos-target">{{ pos.actualToken }}</strong>
+                </div>
+
+                <div class="pos-columns">
+                  <div class="pred-col">
+                    <div class="pred-head original-head">
+                      <span class="pred-model">Original</span>
+                      <span class="pred-rank"
+                        [class.rank-good]="pos.original.actualRank === 1"
+                        [class.rank-ok]="pos.original.actualRank > 1 && pos.original.actualRank <= 5"
+                        [class.rank-bad]="pos.original.actualRank > 5">
+                        Rank #{{ pos.original.actualRank }}
+                        <small>(p={{ pos.original.actualProb | number:'1.4-4' }})</small>
+                      </span>
+                    </div>
+                    <ol class="pred-list">
+                      <li *ngFor="let t of pos.original.topTokens"
+                          [class.is-correct]="t.isActual">
+                        <code>{{ t.token }}</code>
+                        <span class="pred-prob">{{ t.prob | number:'1.4-4' }}</span>
+                      </li>
+                    </ol>
+                  </div>
+
+                  <div class="pred-col">
+                    <div class="pred-head pruned-head">
+                      <span class="pred-model">Pruned</span>
+                      <span class="pred-rank"
+                        [class.rank-good]="pos.pruned.actualRank === 1"
+                        [class.rank-ok]="pos.pruned.actualRank > 1 && pos.pruned.actualRank <= 5"
+                        [class.rank-bad]="pos.pruned.actualRank > 5">
+                        Rank #{{ pos.pruned.actualRank }}
+                        <small>(p={{ pos.pruned.actualProb | number:'1.4-4' }})</small>
+                      </span>
+                    </div>
+                    <ol class="pred-list">
+                      <li *ngFor="let t of pos.pruned.topTokens"
+                          [class.is-correct]="t.isActual">
+                        <code>{{ t.token }}</code>
+                        <span class="pred-prob">{{ t.prob | number:'1.4-4' }}</span>
+                      </li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="empty-state" *ngIf="!textExamples.length">
+        <p>No token-level analysis available yet. Run a benchmark to generate detailed token predictions.</p>
+      </div>
+    </div>
+
+    <!-- ═══ GENERATION TAB ═══ -->
+    <div class="tab-content" *ngIf="activeSection === 'generation'">
+      <div class="generation-intro">
+        <div class="info-card">
+          <span class="info-icon">✍️</span>
+          <div class="info-content">
+            <strong>Generation Comparison</strong>
+            <p>Compare text generated by the original and pruned models side by side. This is the most intuitive way to judge pruning quality does the pruned model still produce coherent, relevant text?</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Custom prompt input -->
+      <div class="custom-prompt-section">
+        <label class="prompt-input-label">Try your own prompt</label>
+        <div class="prompt-input-row">
+          <textarea
+            class="prompt-textarea"
+            [(ngModel)]="customPrompt"
+            placeholder="Enter a prompt to compare generation between original and pruned models…"
+            rows="3">
+          </textarea>
+          <button class="btn-generate" (click)="generateCustom()" [disabled]="!customPrompt.trim() || generatingCustom">
+            {{ generatingCustom ? 'Generating…' : 'Generate' }}
+          </button>
+        </div>
+        <small class="prompt-hint">The models will continue generating text from your prompt. Compare coherence, relevance, and quality.</small>
+      </div>
+
+      <!-- Generation loading state -->
+      <div class="generation-loading" *ngIf="generatingCustom">
+        <p>Loading models and generating text this may take a moment on first use…</p>
+      </div>
+
+      <!-- Custom generation results (history) -->
+      <div class="example-card generation-example" *ngFor="let gen of customGenerationHistory; let i = index">
+        <div class="example-block">
+          <span class="gen-label prompt-label">Your Prompt{{ customGenerationHistory.length > 1 ? ' #' + (customGenerationHistory.length - i) : '' }}</span>
+          <p class="gen-text prompt-text">{{ gen.prompt }}</p>
+        </div>
+        <div class="gen-columns">
+          <div class="gen-col original-col">
+            <span class="gen-label original-label">Original Model</span>
+            <p class="gen-text gen-output">{{ gen.originalCompletion }}</p>
+          </div>
+          <div class="gen-col pruned-col">
+            <span class="gen-label pruned-label">Pruned Model</span>
+            <p class="gen-text gen-output">{{ gen.prunedCompletion }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Default generation example -->
+      <div class="example-card generation-example" *ngIf="generationExample">
+        <div class="example-block">
+          <span class="gen-label prompt-label">Prompt</span>
+          <p class="gen-text prompt-text">{{ generationExample.prompt }}</p>
+        </div>
+        <div class="gen-columns">
+          <div class="gen-col original-col">
+            <span class="gen-label original-label">Original Model</span>
+            <p class="gen-text gen-output">{{ generationExample.originalCompletion }}</p>
+          </div>
+          <div class="gen-col pruned-col">
+            <span class="gen-label pruned-label">Pruned Model</span>
+            <p class="gen-text gen-output">{{ generationExample.prunedCompletion }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="empty-state" *ngIf="!generationExample && !customGenerationHistory.length">
+        <p>No generation examples available yet. Run a benchmark to generate text comparison examples.</p>
+      </div>
+    </div>
+
+    <!-- ═══ TRANSPARENCY TAB ═══ -->
+    <div class="tab-content" *ngIf="activeSection === 'transparency'">
+      <div class="transparency-panel">
+        <h3>How This Works</h3>
+
+        <div class="transparency-card">
+          <h4>Surrogate-Assisted Pruning</h4>
+          <p>Instead of evaluating your model at every possible pruning threshold (which would be extremely expensive), this dashboard uses a <strong>Gaussian Process (GP) surrogate model</strong> to predict how pruning will affect performance. The surrogate was trained on 16 language models across 6 architecture families and learns cross-model patterns in how perplexity degrades as weights are removed.</p>
+          <p>The system only needs to evaluate your model at <strong>two anchor points</strong> (unpruned baseline and maximum pruning at threshold 10) to predict the full pruning curve. This saves roughly 98% of the evaluation cost compared to exhaustive benchmarking.</p>
+        </div>
+
+        <div class="transparency-card">
+          <h4>How Metrics Are Calculated</h4>
+          <p><strong>FLOPs</strong> are computed analytically from the model architecture (layers, hidden size, FFN dimensions) and adjusted proportionally based on the fraction of non-zero parameters remaining after pruning. This is a deterministic structural calculation, not a prediction.</p>
+          <p><strong>Energy (kWh)</strong> is estimated as a <strong>proxy</strong> derived from FLOPs. The baseline energy consumption is measured during the real benchmark evaluation, and energy at other thresholds is scaled proportionally to the FLOPs reduction. This provides a useful approximation, but actual energy consumption depends on hardware utilization, memory access patterns, and other factors not captured by FLOPs alone.</p>
+          <p><strong>CO₂ emissions</strong> are a further proxy, calculated by multiplying the estimated energy by a <strong>regional grid carbon intensity factor</strong> (gCO₂/kWh) for the deployment location you selected. These factors vary significantly (e.g. France ~50 gCO₂/kWh due to nuclear, vs. Australia ~700 gCO₂/kWh). The resulting figure gives a directional estimate of environmental impact, not a precise measurement.</p>
+          <p><strong>Latency and tokens/sec</strong> are measured during the real benchmark step using wall-clock timing on your hardware.</p>
+        </div>
+
+        <div class="transparency-card">
+          <h4>Training Data &amp; Model Coverage</h4>
+          <p>The surrogate was trained on models ranging from <strong>124M to 3B parameters</strong> across the following families:</p>
+          <ul>
+            <li><strong>GPT-2</strong>: 124M, 355M, 774M, 1.5B</li>
+            <li><strong>OPT</strong>: 125M, 350M, 1.3B, 2.7B</li>
+            <li><strong>Phi</strong>: 1.5B, 2.7B</li>
+            <li><strong>LLaMA 3.2</strong>: 1B, 3B</li>
+            <li><strong>Qwen 2.5</strong>: 1.5B, 3B</li>
+            <li><strong>Bloom</strong>: 1.7B &nbsp;|&nbsp; <strong>Pythia</strong>: 1.4B</li>
+          </ul>
+          <p>All evaluations used WikiText-2 as the benchmark dataset. Perplexity measured on a single benchmark may not reflect performance on other tasks or domains.</p>
+        </div>
+
+        <div class="transparency-card">
+          <h4>Key Findings &amp; Limitations</h4>
+          <p>Research findings show that the surrogate achieves <strong>good predictive accuracy for known architecture families</strong>, even at model sizes not seen during training. For example, predictions for GPT-2 XL (1.5B, an unseen size within a known family) showed strong agreement with actual evaluations.</p>
+          <p><strong>For unknown architectures, predictions can be extremely inaccurate.</strong> Bloom 1.7B (an unseen architecture family) exhibited a perplexity degradation spike of a magnitude the surrogate could not predict the actual perplexity increase was far larger and sharper than anything observed in the training data. This demonstrates that different architectures can respond to pruning in fundamentally different ways that a surrogate trained on other families simply cannot anticipate.</p>
+          <p>This is a critical limitation: <strong>when working with model architectures not represented in the training set, treat the predicted curves as rough directional guidance only</strong>, and always validate with a real benchmark before making any decisions.</p>
+          <p>Other important limitations:</p>
+          <ul>
+            <li>Only <strong>magnitude-based (unstructured) pruning</strong> is used. Structured pruning or other compression techniques may produce different trade-offs.</li>
+            <li>Models larger than ~3B parameters were not included in training. Predictions for significantly larger models are extrapolations and should be treated with caution.</li>
+            <li>Energy and CO₂ values are <strong>approximations based on proxies</strong>, not direct physical measurements at every threshold. They are useful for comparing relative impact across thresholds, not as precise absolute figures.</li>
+          </ul>
+        </div>
+
+        <div class="transparency-card">
+          <h4>Uncertainty Communication</h4>
+          <p>Shaded regions in charts represent one standard deviation of prediction uncertainty from the Gaussian Process. Wider bands indicate lower confidence. The benchmark validation step lets you verify predictions against actual measurements at your chosen threshold.</p>
+        </div>
+
+        <div class="transparency-card">
+          <h4>Human-in-the-Loop Design</h4>
+          <p>All pruning decisions remain under your control. The system provides recommendations (such as the knee-point threshold) as advisory guidance, but never automatically applies pruning. You choose the threshold, review the predictions, and decide whether to benchmark.</p>
+          <p class="highlight-text">Final optimization decisions remain under user control.</p>
+        </div>
+
+        <div class="transparency-card">
+          <h4>Privacy &amp; Data Handling</h4>
+          <ul>
+            <li>Uploaded models are processed locally and are <strong>not retained</strong> after analysis.</li>
+            <li>No training occurs on your uploaded models or data.</li>
+            <li>Model weights are only used for the duration of the benchmarking session.</li>
+            <li>Analysis results can be exported and the session data is cleared.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </section>
+</div>
+
+<ng-template #loadingState>
+  <div class="loading-state">
+    <p>Evaluating model…</p>
+  </div>
+</ng-template>

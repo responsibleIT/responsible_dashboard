@@ -54,6 +54,7 @@ export interface PruningPlaygroundData {
   power: Record<number, number>;
   emissions: Record<number, number>;
   performance: Record<number, number>;
+  perplexity?: Record<number, number>;
 }
 
 export interface MetricData {

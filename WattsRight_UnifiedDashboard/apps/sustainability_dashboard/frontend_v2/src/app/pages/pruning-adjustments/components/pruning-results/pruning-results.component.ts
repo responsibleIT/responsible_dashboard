@@ -22,6 +22,10 @@ export class PruningResultsComponent implements OnInit {
   @Input() activeTab: PruningTab;
   @Input() metricCards: PruningMetricCardList;
   @Input() classPerformance: PruningClassPerformance[];
+  @Input() isGenerative = false;
+  @Input() perplexityUpper: Record<number, number> = {};
+  @Input() perplexityLower: Record<number, number> = {};
+  @Input() kneeThreshold: number | null = null;
 
   ngOnInit() {
     console.log('[results] mounted'); // probe

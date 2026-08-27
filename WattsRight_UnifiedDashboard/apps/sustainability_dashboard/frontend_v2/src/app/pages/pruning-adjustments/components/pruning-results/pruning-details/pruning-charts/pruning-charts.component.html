@@ -1,4 +1,20 @@
 <div class="grid">
+  <!-- Chart legend for generative uncertainty band -->
+  <div class="chart-legend" *ngIf="isGenerative">
+    <span class="legend-item">
+      <span class="legend-line" style="background: #05DBAC;"></span>
+      Predicted value
+    </span>
+    <span class="legend-item">
+      <span class="legend-band" style="background: rgba(5, 219, 172, 0.15);"></span>
+      Uncertainty range wider bands indicate lower prediction confidence
+    </span>
+    <span class="legend-item" *ngIf="kneeThreshold !== null">
+      <span class="legend-marker" style="background: #FF6B35;"></span>
+      Recommended knee point
+    </span>
+  </div>
+
   <div class="grid__left">
     <div class="chart-container">
       <app-chart
@@ -24,7 +40,7 @@
     </div>
   </div>
   <div class="grid__right">
-    <div class="chart-container">
+    <div class="chart-container" *ngIf="!isGenerative">
       <app-chart
         [chartTitle]="'Predicted model accuracy'"
         [xAxisLabel]="'Threshold' | uppercase"
@@ -33,6 +49,22 @@
         [titleColor]="'#05DBAC'"
         [lineColor]="'#05DBAC'"
         [rounding]="1"
+      />
+    </div>
+    <div class="chart-container" *ngIf="isGenerative">
+      <app-chart
+        [chartTitle]="'Predicted perplexity'"
+        [xAxisLabel]="'Threshold' | uppercase"
+        [yAxisLabel]="'Perplexity (PPL)' | uppercase"
+        [data]="perplexityChartData | async"
+        [titleColor]="'#05DBAC'"
+        [lineColor]="'#05DBAC'"
+        [rounding]="1"
+        [uncertaintyUpper]="perplexityUpper"
+        [uncertaintyLower]="perplexityLower"
+        [markerX]="kneeThreshold"
+        [markerLabel]="'Knee'"
+        [markerColor]="'#FF6B35'"
       />
     </div>
     <div class="chart-container">

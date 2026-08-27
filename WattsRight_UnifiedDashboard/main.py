@@ -117,7 +117,7 @@ def run_server(role: str, script_path: str, cwd: str | None, log_name: str) -> s
         return subprocess.Popen(cmd, **popen_kwargs)
 
 # -------- Resolve paths inside/beside the bundle --------
-FAIRNESS_SCRIPT = resource_path("apps/fairness_dashboard/flask_ml/app.py")
+# FAIRNESS_SCRIPT = resource_path("apps/fairness_dashboard/flask_ml/app.py")  # Fairness dashboard disabled
 SUSTAINABILITY_DIR = resource_path("apps/sustainability_dashboard/backend/src")
 SUSTAINABILITY_SCRIPT = str(Path(SUSTAINABILITY_DIR) / "app.py")
 FRONTPAGE_HTML = resource_path("frontpage/index.html")
@@ -231,8 +231,8 @@ def ensure_frontends_built() -> bool:
         print("Failed to build sustainability frontend.", flush=True)
         return False
     
-    # Fairness dashboard uses static files (no build needed)
-    print("Fairness dashboard uses static files (no build needed).", flush=True)
+    # Fairness dashboard disabled
+    # print("Fairness dashboard uses static files (no build needed).", flush=True)
     
     print("=" * 50, flush=True)
     print("All frontend builds complete.", flush=True)
@@ -275,14 +275,14 @@ def parent_main(skip_build: bool = False) -> int:
         print(f"Sustainability frontend found: {sustainability_index}", flush=True)
 
     print(f"Resolved paths:", flush=True)
-    print(f"  Fairness script:        {FAIRNESS_SCRIPT}", flush=True)
+    # print(f"  Fairness script:        {FAIRNESS_SCRIPT}", flush=True)  # Fairness dashboard disabled
     print(f"  Sustainability script:  {SUSTAINABILITY_SCRIPT}", flush=True)
     print(f"  Sustainability cwd:     {SUSTAINABILITY_DIR}", flush=True)
     print(f"  Frontpage:              {FRONTPAGE_HTML}", flush=True)
 
     # Sanity checks
     missing = []
-    if not Path(FAIRNESS_SCRIPT).is_file():        missing.append(FAIRNESS_SCRIPT)
+    # if not Path(FAIRNESS_SCRIPT).is_file():        missing.append(FAIRNESS_SCRIPT)  # Fairness dashboard disabled
     if not Path(SUSTAINABILITY_SCRIPT).is_file():  missing.append(SUSTAINABILITY_SCRIPT)
     if not Path(FRONTPAGE_HTML).is_file():         missing.append(FRONTPAGE_HTML)
     if missing:
@@ -297,12 +297,13 @@ def parent_main(skip_build: bool = False) -> int:
     log_dir = Path(tempfile.gettempdir()) / "wattsright_logs"
     print(f"Server logs will be written to: {log_dir}", flush=True)
 
-    fairness_proc = run_server(
-        "FAIRNESS",
-        FAIRNESS_SCRIPT,
-        cwd=str(Path(FAIRNESS_SCRIPT).parent),
-        log_name="fairness",
-    )
+    # Fairness dashboard disabled
+    # fairness_proc = run_server(
+    #     "FAIRNESS",
+    #     FAIRNESS_SCRIPT,
+    #     cwd=str(Path(FAIRNESS_SCRIPT).parent),
+    #     log_name="fairness",
+    # )
     sustainability_proc = run_server(
         "SUSTAINABILITY",
         SUSTAINABILITY_SCRIPT,
@@ -311,12 +312,14 @@ def parent_main(skip_build: bool = False) -> int:
     )
 
     # Splash / progress
-    splash_update("Waiting for Fairness dashboard...")
-    ok1 = wait_for_server(5000, "Fairness dashboard", timeout=60)
-    if ok1:
-        splash_update("Fairness ready")
-    else:
-        splash_update("Fairness failed")
+    # Fairness dashboard disabled
+    # splash_update("Waiting for Fairness dashboard...")
+    # ok1 = wait_for_server(5000, "Fairness dashboard", timeout=60)
+    # if ok1:
+    #     splash_update("Fairness ready")
+    # else:
+    #     splash_update("Fairness failed")
+    ok1 = True  # Fairness dashboard disabled, treat as OK
 
     splash_update("Waiting for Sustainability dashboard...")
     ok2 = wait_for_server(8000, "Sustainability dashboard", timeout=60)
@@ -353,15 +356,15 @@ def parent_main(skip_build: bool = False) -> int:
         # Still keep running if at least one server is up
         if not ok1 and not ok2:
             print("Both servers failed. Exiting.", flush=True)
-            try: fairness_proc.terminate()
-            except Exception: pass
+            # try: fairness_proc.terminate()  # Fairness dashboard disabled
+            # except Exception: pass
             try: sustainability_proc.terminate()
             except Exception: pass
             return 1
 
     # Keep parent alive; clean exit on Ctrl+C
     print("\nServers are running. Press Ctrl+C to stop.", flush=True)
-    print(f"  - Fairness Dashboard:       http://localhost:5000", flush=True)
+    # print(f"  - Fairness Dashboard:       http://localhost:5000", flush=True)  # Fairness dashboard disabled
     print(f"  - Sustainability Dashboard: http://localhost:8000", flush=True)
     print("", flush=True)
     
@@ -369,10 +372,10 @@ def parent_main(skip_build: bool = False) -> int:
         # Wait for either process to exit
         while True:
             # Check if processes are still running
-            f_poll = fairness_proc.poll()
+            # f_poll = fairness_proc.poll()  # Fairness dashboard disabled
             s_poll = sustainability_proc.poll()
             
-            if f_poll is not None and s_poll is not None:
+            if s_poll is not None:  # Only check sustainability (fairness disabled)
                 # Both processes have exited
                 print("Both servers have stopped.", flush=True)
                 break
@@ -380,14 +383,14 @@ def parent_main(skip_build: bool = False) -> int:
             time.sleep(1)
     except KeyboardInterrupt:
         print("\nShutting down servers...", flush=True)
-        try: fairness_proc.terminate()
-        except Exception: pass
+        # try: fairness_proc.terminate()  # Fairness dashboard disabled
+        # except Exception: pass
         try: sustainability_proc.terminate()
         except Exception: pass
         # Give them a moment to clean up
         time.sleep(1)
-        try: fairness_proc.kill()
-        except Exception: pass
+        # try: fairness_proc.kill()  # Fairness dashboard disabled
+        # except Exception: pass
         try: sustainability_proc.kill()
         except Exception: pass
         print("Servers stopped.", flush=True)
@@ -398,9 +401,9 @@ def child_main(role: str) -> int:
     Child branch: run target script *in this process* so frozen exe can act like python.
     """
     try:
-        if role == "FAIRNESS":
-            run_child_script_here(FAIRNESS_SCRIPT, cwd=str(Path(FAIRNESS_SCRIPT).parent))
-        elif role == "SUSTAINABILITY":
+        # if role == "FAIRNESS":  # Fairness dashboard disabled
+        #     run_child_script_here(FAIRNESS_SCRIPT, cwd=str(Path(FAIRNESS_SCRIPT).parent))
+        if role == "SUSTAINABILITY":
             run_child_script_here(SUSTAINABILITY_SCRIPT, cwd=SUSTAINABILITY_DIR)
         else:
             # print(f"Unknown WR_ROLE '{role}'", flush=True)

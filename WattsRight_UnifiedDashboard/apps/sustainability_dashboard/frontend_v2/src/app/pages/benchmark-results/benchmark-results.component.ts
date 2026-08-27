@@ -28,9 +28,9 @@ export class BenchmarkResultsComponent implements OnInit {
   };
   metricCards: BenchmarkMetricCardList | null = null;
 
-  modelName = '—';
-  gpuLabel  = '—';
-  locationLabel = '—';
+  modelName = '-';
+  gpuLabel  = '-';
+  locationLabel = '-';
   thresholdPct: number | null = null;
   sizeReductionPct: number | null = null; // (1 - pruned/original) * 100 when data available
   originalParameters: number | null = null;
@@ -63,9 +63,9 @@ export class BenchmarkResultsComponent implements OnInit {
 }
 
 private hydrate(res: any): void {
-  this.modelName = res?.model ?? res?.modelName ?? '—';
-  this.gpuLabel  = res?.gpu ?? res?.gpuLabel ?? '—';
-  this.locationLabel = res?.location ?? res?.locationLabel ?? '—';
+  this.modelName = res?.model ?? res?.modelName ?? '-';
+  this.gpuLabel  = res?.gpu ?? res?.gpuLabel ?? '-';
+  this.locationLabel = res?.location ?? res?.locationLabel ?? '-';
   this.thresholdPct = typeof res?.threshold === 'number'
     ? Number(res.threshold)
     : (typeof res?.pruningThreshold === 'number' ? Number(res.pruningThreshold) : null);

@@ -18,7 +18,7 @@
   select {
     display: block;
     width: 100%;
-    padding: 8px 16px;
+    padding: 8px 32px 8px 16px;
     font-size: 1rem;
     font-weight: 400;
     font-family: prompt-button, sans-serif;
@@ -27,8 +27,12 @@
     line-height: 1.5;
     appearance: none;
     background-color: var(--color-background-secondary);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2386879C' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
     border: 1px solid var(--color-border-primary);
     border-radius: 8px;
     transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+    cursor: pointer;
   }
 }

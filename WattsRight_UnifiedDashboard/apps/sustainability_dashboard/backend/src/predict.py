@@ -2,8 +2,6 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import pickle
-import tensorflow as tf
-from keras.models import load_model
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error
 
@@ -28,7 +26,7 @@ def prepare_prediction_inputs_from_dict(
     Prepares unscaled dynamic features, acc_0, and acc_10 from the
     pruned_data_dict for a single model instance.
     """
-    # Expecting integer keys 0 and 10 for acc_0 and acc_10 as per user's example
+    # Expecting integer keys 0 and 10 for acc_0 and acc_10
     if 0 not in pruned_data_dict: # Check for int key 0
         raise KeyError(f"Key 0 (for {perf_metric_key} at threshold 0.0) not found in pruned_data_dict.")
     if 10 not in pruned_data_dict: # Check for int key 10
@@ -62,7 +60,6 @@ def prepare_prediction_inputs_from_dict(
 
 
 # --- Auto-Regressive Prediction Function (WITH acc_10 input) ---
-# This function remains unchanged from your original script
 def predict_auto_regressively_with_acc10(model_to_use,
                                          unscaled_dynamic_features_sample, # Shape: (seq_len, num_dyn_feat)
                                          unscaled_acc_0,
@@ -121,6 +118,7 @@ def predict_auto_regressively_with_acc10(model_to_use,
 
 def predict_with_auto_regressive_model(input_pruned_data, performance_metric_key="performance_metric"):
     try:
+        from keras.models import load_model  # lazy import avoids TF/numpy conflicts
         model = load_model(MODEL_FILE_PATH)
 
         with open(X_SCALER_PATH, 'rb') as f:

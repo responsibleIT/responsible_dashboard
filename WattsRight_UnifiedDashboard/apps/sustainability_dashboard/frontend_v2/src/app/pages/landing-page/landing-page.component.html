@@ -1,8 +1,22 @@
 <div class="page-container">
   <div class="content">
     <h1>{{ 'Welcome to the WattsRight sustainability analysis dashboard' | uppercase }}</h1>
+    <p class="subtitle">Explore sustainable model optimization through surrogate-assisted magnitude pruning. Reduce computational cost and environmental impact while preserving model quality.</p>
+
+    <!-- Compact workflow overview -->
+    <div class="workflow-steps">
+      <div class="step"><span class="step-num">1</span><span class="step-text">Select a model</span></div>
+      <div class="step-arrow">→</div>
+      <div class="step"><span class="step-num">2</span><span class="step-text">Baseline benchmark</span></div>
+      <div class="step-arrow">→</div>
+      <div class="step"><span class="step-num">3</span><span class="step-text">Explore predictions</span></div>
+      <div class="step-arrow">→</div>
+      <div class="step"><span class="step-num">4</span><span class="step-text">Choose threshold</span></div>
+      <div class="step-arrow">→</div>
+      <div class="step"><span class="step-num">5</span><span class="step-text">Validate & compare</span></div>
+    </div>
+
     <div class="buttons">
-      <!-- <button appButton [deeptrust]="true">Onboarding</button> -->
       <button appButton [fairbeige]="true" (click)="optimizeClick()">Start optimizing</button>
     </div>
   </div>
